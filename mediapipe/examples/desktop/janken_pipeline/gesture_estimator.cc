@@ -140,7 +140,7 @@ const GestureType HeartGestureEstimator::Recognize(
     auto &landms1 = hand_landmarks_list[0];
     auto &landms2 = hand_landmarks_list[1];
 
-    const float eps = 0.05;
+    const float eps = 0.08;
 
     const bool thumb_nodes_status1 =
         abs(landms1.landmark(4).x() - landms2.landmark(4).x()) < eps;
@@ -181,7 +181,6 @@ const GestureType HeartGestureEstimator::Recognize(
          (middle_nodes_status1 && middle_nodes_status2) &&
          (ring_nodes_status1 && ring_nodes_status2) &&
          (pinky_nodes_status1 && pinky_nodes_status2)))
-        // if (thumb_nodes_status && pinky_nodes_status)
         ret_type = GestureType::HEART;
 
     return ret_type;

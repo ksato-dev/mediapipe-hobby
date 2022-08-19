@@ -50,6 +50,25 @@ constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++";
 
+// 画像を画像に貼り付ける関数
+// ref: https://kougaku-navi.hatenablog.com/entry/20160108/p1
+void Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width, int height) {
+	cv::Mat resized_img;
+	cv::resize(src, resized_img, cv::Size(width, height));
+
+	if (x >= dst.cols || y >= dst.rows) return;
+	int w = (x >= 0) ? std::min(dst.cols - x, resized_img.cols) : std::min(std::max(resized_img.cols + x, 0), dst.cols);
+	int h = (y >= 0) ? std::min(dst.rows - y, resized_img.rows) : std::min(std::max(resized_img.rows + y, 0), dst.rows);
+	int u = (x >= 0) ? 0 : std::min(-x, resized_img.cols - 1);
+	int v = (y >= 0) ? 0 : std::min(-y, resized_img.rows - 1);
+	int px = std::max(x, 0);
+	int py = std::max(y, 0);
+
+	cv::Mat roi_dst = dst(cv::Rect(px, py, w, h));
+	cv::Mat roi_resized = resized_img(cv::Rect(u, v, w, h));
+	roi_resized.copyTo(roi_dst);
+}
+
 void DrawNodePoints(const mediapipe::NormalizedLandmarkList &landmarks,
                     const cv::Mat &camera_frame_raw, cv::Mat *output_frame_mat) {
   for (int j = 0; j < landmarks.landmark_size(); j++) {
@@ -190,6 +209,8 @@ absl::Status RunMPPGraph(
     graph.WaitUntilIdle();
 
     cv::Mat output_frame_mat = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
+    // cv::Mat output_frame_mat;
+    // camera_frame_raw.copyTo(output_frame_mat);
 
     for (int i = 0; i < landmarks_list.size(); i++) {
       mediapipe::NormalizedLandmarkList &landmarks = landmarks_list[i];
@@ -209,6 +230,7 @@ absl::Status RunMPPGraph(
 
     GestureType pre_recognized_type = GestureType::UNKNOWN;
     if (landmarks_list.size() == 1) {
+      // 片手
       for (auto &estimator : one_hand_estimator_list) {
         // std::cout << landmarks_list[0].landmark_size() << std::endl;
         estimator->Initialize();
@@ -219,11 +241,13 @@ absl::Status RunMPPGraph(
           if (pre_recognized_type == GestureType::UNKNOWN)
             cv::putText(output_frame_mat, print_msg, cv::Point(10, 30), 2, 1.0,
                         cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+          
           pre_recognized_type = recognized_type;
         }
       }
     }
     else if (landmarks_list.size() == 2) {
+      // 両手
       for (auto &estimator : two_hands_estimator_list) {
         // std::cout << landmarks_list[0].landmark_size() << std::endl;
         estimator->Initialize();
@@ -234,6 +258,12 @@ absl::Status RunMPPGraph(
           if (pre_recognized_type == GestureType::UNKNOWN)
             cv::putText(output_frame_mat, print_msg, cv::Point(10, 30), 2, 1.0,
                         cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+
+          if (recognized_type == GestureType::HEART) {
+            const cv::Mat overlap_image = cv::imread("mediapipe/resources/heart.png");
+            Overlap(output_frame_mat, overlap_image, 10, camera_frame_raw.rows - 55, 45, 45);
+          }
+
           pre_recognized_type = recognized_type;
         }
       }

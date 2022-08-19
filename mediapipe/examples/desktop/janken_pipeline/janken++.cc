@@ -43,17 +43,53 @@
 #include "mediapipe/framework/port/parse_text_proto.h"
 #include "mediapipe/framework/port/status.h"
 
+#include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
+
 constexpr char kInputStream[] = "input_video";
 // constexpr char kOutputStream[] = "output_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++";
 
-// mediapipe::CalculatorGraphConfig config;
-// mediapipe::CalculatorGraph graph;
-const std::vector<int> kLeftIdxList = {362, 398, 382, 384, 381, 385, 380, 386,
-                                       374, 387, 373, 388, 390, 466, 249, 263};
-const std::vector<int> kRightIdxList = {133, 173, 155, 157, 154, 158, 153, 159,
-                                        145, 160, 144, 161, 163, 246, 7,   33};
+void DrawNodePoints(const mediapipe::NormalizedLandmarkList &landmarks,
+                    const cv::Mat &camera_frame_raw, cv::Mat *output_frame_mat) {
+  for (int j = 0; j < landmarks.landmark_size(); j++) {
+    auto &landmark = landmarks.landmark(j);
+    int x = int(std::round(landmark.x() * camera_frame_raw.cols));
+    int y = int(std::round(landmark.y() * camera_frame_raw.rows));
+    // std::cout << "x, y = " << x << ", " << y
+    //           << std::endl;
+    cv::circle(*output_frame_mat, cv::Point(x, y), 2, cv::Scalar(0, 0, 255), 4,
+               cv::LINE_4);
+  }
+}
+
+void DrawFrameLines(const mediapipe::NormalizedLandmarkList &landmarks,
+                    const cv::Mat &camera_frame_raw, cv::Mat *output_frame_mat) {
+  const std::vector<std::vector<int>> connection_list = {
+    {0, 1}, {1, 2}, {2, 3}, {3, 4},
+    {0, 5}, {5, 6}, {6, 7}, {7, 8},
+    {5, 9},
+    {9, 10}, {10, 11}, {11, 12},
+    {9, 13},
+    {13, 14}, {14, 15}, {15, 16},
+    {13, 17},
+    {17, 18}, {18, 19}, {19, 20},
+    {0, 17},
+  };
+  // index
+  for (auto &conn : connection_list) {
+    auto &landmark1 = landmarks.landmark(conn[0]);
+    int x1 = int(std::round(landmark1.x() * camera_frame_raw.cols));
+    int y1 = int(std::round(landmark1.y() * camera_frame_raw.rows));
+
+    auto &landmark2 = landmarks.landmark(conn[1]);
+    int x2 = int(std::round(landmark2.x() * camera_frame_raw.cols));
+    int y2 = int(std::round(landmark2.y() * camera_frame_raw.rows));
+
+    cv::line(*output_frame_mat, cv::Point(x1, y1), cv::Point(x2, y2),
+             cv::Scalar(0, 255, 0), 4, cv::LINE_4);
+  }
+}
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -81,7 +117,17 @@ absl::Status RunMPPGraph(
 
   std::vector<mediapipe::NormalizedLandmarkList> landmarks_list;
 
-  static mediapipe::CalculatorGraph graph;
+  std::vector<std::shared_ptr<AbstractHandGestureEstimator>> one_hand_estimator_list = {
+    std::make_shared<GuGestureEstimator>(),
+    std::make_shared<ChokiGestureEstimator>(),
+    std::make_shared<PaGestureEstimator>(),
+  };
+
+  std::vector<std::shared_ptr<AbstractHandGestureEstimator>> two_hands_estimator_list = {
+    std::make_shared<HeartGestureEstimator>()
+  };
+
+  mediapipe::CalculatorGraph graph;
 
   // 初回だけ初期化
   if (!graph.HasInputStream("input_video")) {
@@ -144,7 +190,6 @@ absl::Status RunMPPGraph(
     graph.WaitUntilIdle();
 
     cv::Mat output_frame_mat = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
-    // camera_frame_raw.copyTo(output_frame_mat);
 
     for (int i = 0; i < landmarks_list.size(); i++) {
       mediapipe::NormalizedLandmarkList &landmarks = landmarks_list[i];
@@ -153,17 +198,47 @@ absl::Status RunMPPGraph(
 
       // const int num_refined_landmarks = 478;
 
-      for (int j = 0; j < landmarks.landmark_size(); j++) {
-        auto &landmark = landmarks.landmark(j);
-        int x = int(std::round(landmark.x() * camera_frame_raw.cols));
-        int y = int(std::round(landmark.y() * camera_frame_raw.rows));
-        // std::cout << "x, y = " << x << ", " << y
-        //           << std::endl;
-        cv::circle(output_frame_mat, cv::Point(x, y), 2, cv::Scalar(0,255,0), 4, cv::LINE_4);
-      }
+      // draw frame-lines
+      DrawFrameLines(landmarks, camera_frame_raw, &output_frame_mat);
 
-      break;  // 片方の手だけ利用する。
+      // draw node-points
+      DrawNodePoints(landmarks, camera_frame_raw, &output_frame_mat);
+
+      // break;  // 片方の手だけ利用する。
     }
+
+    GestureType pre_recognized_type = GestureType::UNKNOWN;
+    if (landmarks_list.size() == 1) {
+      for (auto &estimator : one_hand_estimator_list) {
+        // std::cout << landmarks_list[0].landmark_size() << std::endl;
+        estimator->Initialize();
+        const GestureType recognized_type = estimator->Recognize(landmarks_list);
+        if (recognized_type != GestureType::UNKNOWN) {
+          // std::cout << "Gesture-type: " << recognized_type << std::endl;
+          std::string print_msg = "Gesture ID: " + std::to_string(recognized_type);
+          if (pre_recognized_type == GestureType::UNKNOWN)
+            cv::putText(output_frame_mat, print_msg, cv::Point(10, 30), 2, 1.0,
+                        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+          pre_recognized_type = recognized_type;
+        }
+      }
+    }
+    else if (landmarks_list.size() == 2) {
+      for (auto &estimator : two_hands_estimator_list) {
+        // std::cout << landmarks_list[0].landmark_size() << std::endl;
+        estimator->Initialize();
+        const GestureType recognized_type = estimator->Recognize(landmarks_list);
+        if (recognized_type != GestureType::UNKNOWN) {
+          // std::cout << "Gesture-type: " << recognized_type << std::endl;
+          std::string print_msg = "Gesture ID: " + std::to_string(recognized_type);
+          if (pre_recognized_type == GestureType::UNKNOWN)
+            cv::putText(output_frame_mat, print_msg, cv::Point(10, 30), 2, 1.0,
+                        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+          pre_recognized_type = recognized_type;
+        }
+      }
+    }
+
     landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
 
     // cv::cvtColor(output_frame_mat, output_frame_mat, cv::COLOR_RGB2BGR);

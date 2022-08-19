@@ -25,11 +25,12 @@ cc_binary(
 
     visibility = ["//visibility:public"],
 
-    linkopts = ["-/SUBSYSTEM:WINDOWS"],
+    # linkopts = ["-/SUBSYSTEM:WINDOWS"],
     deps = [
         # "//mediapipe/examples/desktop:janken++",
         "//mediapipe/graphs/hand_tracking:desktop_tflite_calculators",
 
+        "//mediapipe/examples/desktop/janken_pipeline:gesture_estimator",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:image_frame_opencv",
@@ -42,4 +43,16 @@ cc_binary(
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/flags:parse",
     ],
+)
+
+cc_library(
+    name = "gesture_estimator",
+    srcs = ["gesture_estimator.cc"],
+    hdrs = ["gesture_estimator.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/calculators/util:detections_to_rects_calculator",
+        "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+    ],
+    alwayslink = 1,
 )

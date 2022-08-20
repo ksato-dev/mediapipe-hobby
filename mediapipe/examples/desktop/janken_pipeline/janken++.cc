@@ -57,7 +57,7 @@ constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++";
 
-const int kBufferSize = 40;
+const int kBufferSize = 25;
 
 const std::vector<std::vector<int>> kConnectionList = {
   {0, 1}, {1, 2}, {2, 3}, {3, 4},
@@ -207,14 +207,16 @@ absl::Status RunMPPGraph(
   // kOperationMsgList.push_back(std::string("aaa"));  // 英語はいける。やっぱ日本語はクソ
 
   // 英語版
-  kOperationMsgMap[ResultType::WIN] = std::string(": Win this gesture!");
-  kOperationMsgMap[ResultType::LOSE] = std::string(": Lose this gesture!");
-  kOperationMsgMap[ResultType::DRAW] = std::string(": Draw this gesture!");
+  kOperationMsgMap[ResultType::WIN] = std::string("Win this gesture!");
+  kOperationMsgMap[ResultType::LOSE] = std::string("Lose this gesture!");
+  kOperationMsgMap[ResultType::DRAW] = std::string("Draw this gesture!");
 
   std::random_device rnd; // 非決定的な乱数生成器
-  std::mt19937_64 mt(rnd()); // メルセンヌ・ツイスタの32ビット版、引数は初期シード
+  std::mt19937_64 mt(rnd()); // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
+  // std::uniform_int_distribution<> operation_rand_n(
+  //     1, (int)(ResultType::NUM_RESULT_TYPES) - 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> operation_rand_n(
-      1, (int)(ResultType::NUM_RESULT_TYPES) - 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+      1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> opposite_gesture_rand_n(
       1, (int)(JankenGestureType::NUM_GESTURES) - 1); // [1, n] 範囲の一様乱数, UNKNOWMN はスキップ
 
@@ -260,6 +262,8 @@ absl::Status RunMPPGraph(
 
   ResultType operation = ResultType(operation_rand_n(mt));
   JankenGestureType opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+
+  int time_since_resetting = 1000;  // 初期値が０だとはじめに〇が出てしまう。
 
   while (grab_frames) {
     cv::Mat camera_frame_raw;
@@ -370,7 +374,7 @@ absl::Status RunMPPGraph(
     // Write text.
     if (current_recognized_type != JankenGestureType::UNKNOWN)
       cv::putText(output_frame_display_right, "Your gesture",
-                  cv::Point(camera_frame_raw.rows / 2 - 100, 30), 2, 0.8,
+                  cv::Point(camera_frame_raw.rows / 2 - 100, 35), 2, 1.0,
                   cv::Scalar(0, 255, 0), 2, cv::LINE_4);
 
     // Update all status-buffer.
@@ -402,10 +406,18 @@ absl::Status RunMPPGraph(
               << (int)(candidate_of_gesture_type) << ", "
               << (int)(opposite_gesture) << ", " << (int)(operation)
               << std::endl;
-    if (current_result_type == operation && 0.8 < max_score) {
+
+    if (current_result_type == operation && 0.6 < max_score) {
       win_cnt++;
-      opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+
+      // 相手の次の手は今のと重複しないようにする。
+      JankenGestureType pre_oppo_gesture = opposite_gesture;
+      while (pre_oppo_gesture == opposite_gesture)
+        opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+
       operation = ResultType(operation_rand_n(mt));
+
+      time_since_resetting = 0;
     }
 
     landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
@@ -419,10 +431,20 @@ absl::Status RunMPPGraph(
     // output_frame_display_left = cv::Mat::zeros(
     //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-    cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(10, 30), 2, 1.0,
+    cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(15, 35), 2, 1.0,
                 cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-    cv::putText(output_frame_display_left, std::to_string(win_cnt), cv::Point(10, camera_frame_raw.rows - 50), 2, 1.0,
+    cv::putText(output_frame_display_left, std::string("Score: ") + std::to_string(win_cnt), cv::Point(20, camera_frame_raw.rows - 20), 2, 1.0,
                 cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+
+    if (time_since_resetting < 10) {
+      cv::circle(
+          output_frame_display_left,
+          cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2), 100,
+          cv::Scalar(0, 255, 0), 5, cv::LINE_4);
+      time_since_resetting++;
+    }
+    // cv::circle(*output_frame_display_right, cv::Point(x, y), 2, cv::Scalar(0, 0, 255), 4,
+    //            cv::LINE_4);
     // --- 左の表示
 
     cv::Mat output_frame_display;

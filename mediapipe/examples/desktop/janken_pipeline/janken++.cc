@@ -49,14 +49,15 @@
 #include "mediapipe/framework/port/status.h"
 
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
+#include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 
-// TODO: Convert parameters from local to global.
+// TODO: Convert parameters from local to global, & move parameters to external file.
 constexpr char kInputStream[] = "input_video";
 // constexpr char kOutputStream[] = "output_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++";
 
-const int kBufferSize = 50;
+const int kBufferSize = 40;
 
 const std::vector<std::vector<int>> kConnectionList = {
   {0, 1}, {1, 2}, {2, 3}, {3, 4},
@@ -70,11 +71,13 @@ const std::vector<std::vector<int>> kConnectionList = {
   {0, 17},
 };
 
+std::map<JankenGestureType, cv::Mat> kGestureImageMap;
+
 // ステータスバッファー更新
 // TODO: Convert class ---
 void InitializeGestureStatusBufferList(
     const int &buffer_size, std::vector<std::deque<int>> *status_buffer_list) {
-  for (int i = 0; i < GestureType::NUM_GESTURES; i++)
+  for (int i = 0; i < (int)(JankenGestureType::NUM_GESTURES); i++)
     status_buffer_list->push_back(std::deque<int>(buffer_size, 0));
 }
 
@@ -187,25 +190,33 @@ absl::Status RunMPPGraph(
     std::vector<std::vector<cv::Point2i>> *left_eye_landmarks_list,
     std::vector<std::vector<cv::Point2i>> *right_eye_landmarks_list) {
 
+  kGestureImageMap[JankenGestureType::GU] = cv::imread("mediapipe/resources/gu.png");
+  kGestureImageMap[JankenGestureType::CHOKI] = cv::imread("mediapipe/resources/choki.png");
+  kGestureImageMap[JankenGestureType::PA] = cv::imread("mediapipe/resources/pa.png");
+  // kGestureImageMap[JankenGestureType::HEART] = cv::imread("mediapipe/resources/heart.png");
+
+  int win_cnt = 0;
   std::vector<std::deque<int>> status_buffer_list;
   InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
 
-  std::vector<std::string> kThemeMsgList(0);
+  std::map<ResultType, std::string> kOperationMsgMap;
   // なぜか下記が実行できなくてキレそう（キレてる）
-  // kThemeMsgList.push_back(std::string("に勝て！"));
-  // kThemeMsgList.push_back(std::string("に負けろ！"));
-  // kThemeMsgList.push_back(std::string("とあいこ！"));
-  // kThemeMsgList.push_back(std::string("aaa"));  // 英語はいける。やっぱ日本語はクソ
+  // kOperationMsgList.push_back(std::string("に勝て！"));
+  // kOperationMsgList.push_back(std::string("に負けろ！"));
+  // kOperationMsgList.push_back(std::string("とあいこ！"));
+  // kOperationMsgList.push_back(std::string("aaa"));  // 英語はいける。やっぱ日本語はクソ
 
   // 英語版
-  kThemeMsgList.push_back(std::string(": Win this gesture!"));
-  kThemeMsgList.push_back(std::string(": Lose this gesture!"));
-  kThemeMsgList.push_back(std::string(": Draw this gesture!"));
+  kOperationMsgMap[ResultType::WIN] = std::string(": Win this gesture!");
+  kOperationMsgMap[ResultType::LOSE] = std::string(": Lose this gesture!");
+  kOperationMsgMap[ResultType::DRAW] = std::string(": Draw this gesture!");
 
   std::random_device rnd; // 非決定的な乱数生成器
   std::mt19937_64 mt(rnd()); // メルセンヌ・ツイスタの32ビット版、引数は初期シード
-  std::uniform_int_distribution<> rand_n(
-      0, kThemeMsgList.size() - 1); // [0, n] 範囲の一様乱数
+  std::uniform_int_distribution<> operation_rand_n(
+      1, (int)(ResultType::NUM_RESULT_TYPES) - 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+  std::uniform_int_distribution<> opposite_gesture_rand_n(
+      1, (int)(JankenGestureType::NUM_GESTURES) - 1); // [1, n] 範囲の一様乱数, UNKNOWMN はスキップ
 
   // std::cout << "called RunMPPGraph" << std::endl;
   mediapipe::CalculatorGraphConfig config;
@@ -220,9 +231,9 @@ absl::Status RunMPPGraph(
     std::make_shared<PaGestureEstimator>(),
   };
 
-  std::vector<std::shared_ptr<AbstractHandGestureEstimator>> two_hands_estimator_list = {
-    std::make_shared<HeartGestureEstimator>()
-  };
+  // std::vector<std::shared_ptr<AbstractHandGestureEstimator>> two_hands_estimator_list = {
+  //   std::make_shared<HeartGestureEstimator>()
+  // };
 
   mediapipe::CalculatorGraph graph;
 
@@ -246,6 +257,9 @@ absl::Status RunMPPGraph(
   capture.open(0);
 
   bool grab_frames = true;
+
+  ResultType operation = ResultType(operation_rand_n(mt));
+  JankenGestureType opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
 
   while (grab_frames) {
     cv::Mat camera_frame_raw;
@@ -298,25 +312,19 @@ absl::Status RunMPPGraph(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
     // TODO: refactor
-    std::vector<int> new_status_list(GestureType::NUM_GESTURES);
+    std::vector<int> new_status_list((int)(JankenGestureType::NUM_GESTURES));
 
-    GestureType last_recognized_type = GestureType::UNKNOWN;
+    auto current_recognized_type = JankenGestureType::UNKNOWN;
     if (landmarks_list.size() == 1) {
       // 片手
       cv::Mat gesture_image;
       for (auto &estimator : one_hand_estimator_list) {
         // std::cout << landmarks_list[0].landmark_size() << std::endl;
         estimator->Initialize();
-        const GestureType recognized_type = estimator->Recognize(landmarks_list);
-        if (recognized_type != GestureType::UNKNOWN) {
-          if (recognized_type == GestureType::GU)
-            gesture_image = cv::imread("mediapipe/resources/gu.png");
-          else if (recognized_type == GestureType::CHOKI)
-            gesture_image = cv::imread("mediapipe/resources/choki.png");
-          else if (recognized_type == GestureType::PA)
-            gesture_image = cv::imread("mediapipe/resources/pa.png");
-
-          last_recognized_type = recognized_type;
+        const JankenGestureType recognized_type = estimator->Recognize(landmarks_list);
+        if (recognized_type != JankenGestureType::UNKNOWN) {
+          gesture_image = kGestureImageMap[recognized_type];
+          current_recognized_type = recognized_type;
         }
       }
       if (gesture_image.empty()) {
@@ -327,48 +335,46 @@ absl::Status RunMPPGraph(
         cv::resize(gesture_image, gesture_image,
                    cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
       }
-      Overlap(gesture_image, landmark_image, -3,
-              camera_frame_raw.rows - 105,
-              std::roundl(camera_frame_raw.cols * 0.25),
-              std::roundl(camera_frame_raw.rows * 0.25));
+      Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
+              camera_frame_raw.rows - 110,
+              std::roundl(camera_frame_raw.cols * 0.22),
+              std::roundl(camera_frame_raw.rows * 0.22));
       output_frame_display_right = gesture_image;
     }
-    else if (landmarks_list.size() == 2) {
-      // 両手
-      cv::Mat gesture_image;
-      for (auto &estimator : two_hands_estimator_list) {
-        estimator->Initialize();
-        const GestureType recognized_type = estimator->Recognize(landmarks_list);
-        if (recognized_type != GestureType::UNKNOWN) {
-          if (recognized_type == GestureType::HEART)
-            gesture_image = cv::imread("mediapipe/resources/heart.png");
-
-          last_recognized_type = recognized_type;
-        }
-      }
-      if (gesture_image.empty()) {
-        gesture_image = cv::Mat::zeros(
-            cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
-      }
-      else {
-        cv::resize(gesture_image, gesture_image,
-                   cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-      }
-      Overlap(gesture_image, landmark_image, -3,
-              camera_frame_raw.rows - 105,
-              std::roundl(camera_frame_raw.cols * 0.25),
-              std::roundl(camera_frame_raw.rows * 0.25));
-      output_frame_display_right = gesture_image;
-    }
+    // else if (landmarks_list.size() == 2) {
+    //   // 両手
+    //   cv::Mat gesture_image;
+    //   for (auto &estimator : two_hands_estimator_list) {
+    //     estimator->Initialize();
+    //     const GestureType recognized_type = estimator->Recognize(landmarks_list);
+    //     if (recognized_type != GestureType::UNKNOWN) {
+    //       gesture_image = kGestureImageMap[recognized_type];
+    //       current_recognized_type = recognized_type;
+    //     }
+    //   }
+    //   if (gesture_image.empty()) {
+    //     gesture_image = cv::Mat::zeros(
+    //         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+    //   }
+    //   else {
+    //     cv::resize(gesture_image, gesture_image,
+    //                cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
+    //   }
+    //   Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
+    //           camera_frame_raw.rows - 110,
+    //           std::roundl(camera_frame_raw.cols * 0.22),
+    //           std::roundl(camera_frame_raw.rows * 0.22));
+    //   output_frame_display_right = gesture_image;
+    // }
 
     // Write text.
-    if (last_recognized_type != GestureType::UNKNOWN)
+    if (current_recognized_type != JankenGestureType::UNKNOWN)
       cv::putText(output_frame_display_right, "Your gesture",
                   cv::Point(camera_frame_raw.rows / 2 - 100, 30), 2, 0.8,
                   cv::Scalar(0, 255, 0), 2, cv::LINE_4);
 
     // Update all status-buffer.
-    new_status_list[last_recognized_type]++;
+    new_status_list[(int)(current_recognized_type)]++;
     // for (auto &new_status : new_status_list)
     //   std::cout << new_status << " ";
     // std::cout << std::endl;
@@ -377,44 +383,49 @@ absl::Status RunMPPGraph(
 
     std::vector<float> result_list;
     CalculateStatistics(status_buffer_list, &result_list);
-    GestureType candidate_of_gesture_type = GestureType::UNKNOWN;
-    float max_value = 0;
+    JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
+    float max_score = 0;
     for (int i = 0; i < result_list.size(); i++) {
-      if (max_value < result_list[i]) {
-        candidate_of_gesture_type = GestureType(i);
-        max_value = result_list[i];
+      if (max_score < result_list[i]) {
+        candidate_of_gesture_type = JankenGestureType(i);
+        max_score = result_list[i];
       }
     }
-    std::cout << "GestureType: " << candidate_of_gesture_type << std::endl;
+    // std::cout << "GestureType: " << (int)(candidate_of_gesture_type) << std::endl;
+
+    // Judgement
+    const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
+        candidate_of_gesture_type, opposite_gesture);
+
+    std::cout << "Current result, Your gesture, Opposite gesture, Operation: "
+              << (int)(current_result_type) << ", "
+              << (int)(candidate_of_gesture_type) << ", "
+              << (int)(opposite_gesture) << ", " << (int)(operation)
+              << std::endl;
+    if (current_result_type == operation && 0.8 < max_score) {
+      win_cnt++;
+      opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+      operation = ResultType(operation_rand_n(mt));
+    }
 
     landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
-
-    cv::Mat output_frame_display;
-
-    // 左の表示 ---
-    // cv::Mat output_frame_display_left = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
-    // cv::Mat output_frame_display_left = cv::Mat::zeros(
-    //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
-    // int cols = output_frame_display_left.cols;
-    // int rows = output_frame_display_left.rows;
-    // for (int j = 0; j < rows; j++) {
-    //     for (int i = 0; i < cols; i++) {
-    //         output_frame_display_left.at<cv::Vec3b>(j, i)[0] = 255; //青
-    //         output_frame_display_left.at<cv::Vec3b>(j, i)[1] = 255; //緑
-    //         output_frame_display_left.at<cv::Vec3b>(j, i)[2] = 255; //赤
-    //     }
-    // }
 
     cv::Mat output_frame_display_left;
     // CreateWhiteImage(cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
     //                  &output_frame_display_left);
-    output_frame_display_left = cv::Mat::zeros(
-        cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+    output_frame_display_left = kGestureImageMap[opposite_gesture];
+    cv::resize(output_frame_display_left, output_frame_display_left,
+               cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
+    // output_frame_display_left = cv::Mat::zeros(
+    //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-    cv::putText(output_frame_display_left, kThemeMsgList[rand_n(mt)], cv::Point(10, 30), 2, 1.0,
+    cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(10, 30), 2, 1.0,
+                cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+    cv::putText(output_frame_display_left, std::to_string(win_cnt), cv::Point(10, camera_frame_raw.rows - 50), 2, 1.0,
                 cv::Scalar(0, 255, 0), 2, cv::LINE_4);
     // --- 左の表示
 
+    cv::Mat output_frame_display;
     cv::hconcat(output_frame_display_left, output_frame_display_right, output_frame_display);
     // --- PostProcess
 

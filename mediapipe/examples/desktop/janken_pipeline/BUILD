@@ -31,6 +31,7 @@ cc_binary(
         "//mediapipe/graphs/hand_tracking:desktop_tflite_calculators",
 
         "//mediapipe/examples/desktop/janken_pipeline:gesture_estimator",
+        "//mediapipe/examples/desktop/janken_pipeline:janken_judgement",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:image_frame_opencv",
@@ -49,6 +50,18 @@ cc_library(
     name = "gesture_estimator",
     srcs = ["gesture_estimator.cc"],
     hdrs = ["gesture_estimator.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/calculators/util:detections_to_rects_calculator",
+        "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "janken_judgement",
+    srcs = ["janken_judgement.cc"],
+    hdrs = ["janken_judgement.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/calculators/util:detections_to_rects_calculator",

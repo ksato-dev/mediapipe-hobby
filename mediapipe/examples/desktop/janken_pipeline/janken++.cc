@@ -20,8 +20,9 @@
 #include <vector>
 #include <random>
 #include <fstream>
-#include <locale.h>
-#include <wchar.h>
+#include <deque>
+// #include <locale.h>
+// #include <wchar.h>
 
 #include "absl/flags/flag.h"
 #include "absl/flags/parse.h"
@@ -49,10 +50,13 @@
 
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 
+// TODO: Convert parameters from local to global.
 constexpr char kInputStream[] = "input_video";
 // constexpr char kOutputStream[] = "output_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++";
+
+const int kBufferSize = 50;
 
 const std::vector<std::vector<int>> kConnectionList = {
   {0, 1}, {1, 2}, {2, 3}, {3, 4},
@@ -65,6 +69,39 @@ const std::vector<std::vector<int>> kConnectionList = {
   {17, 18}, {18, 19}, {19, 20},
   {0, 17},
 };
+
+// ステータスバッファー更新
+// TODO: Convert class ---
+void InitializeGestureStatusBufferList(
+    const int &buffer_size, std::vector<std::deque<int>> *status_buffer_list) {
+  for (int i = 0; i < GestureType::NUM_GESTURES; i++)
+    status_buffer_list->push_back(std::deque<int>(buffer_size, 0));
+}
+
+void UpdateGestureStatusBufferList(
+    const std::vector<int> &new_status_list,
+    std::vector<std::deque<int>> *status_buffer_list) {
+  const int buffer_size = status_buffer_list->at(0).size();
+  for (int i = 0; i < status_buffer_list->size(); i++) {
+    status_buffer_list->at(i).pop_front();
+    status_buffer_list->at(i).push_back(new_status_list[i]);
+  }
+}
+
+void CalculateStatistics(const std::vector<std::deque<int>> &status_buffer_list,
+                         std::vector<float> *result_list) {
+  const int buffer_size = status_buffer_list.at(0).size();
+  for (int i = 0; i < status_buffer_list.size(); i++) {
+    auto &status_buffer = status_buffer_list.at(i);
+    float sum_status = 0.0;
+    for (int j = 0; j < status_buffer.size(); j++) {
+      sum_status += status_buffer.at(j);
+    }
+    const float avg_status = sum_status / (float)buffer_size;
+    result_list->push_back(avg_status);
+  }
+}
+// --- Convert class
 
 // 白画像を作る関数
 void CreateWhiteImage(const cv::Size &size, cv::Mat *output_image) {
@@ -150,8 +187,10 @@ absl::Status RunMPPGraph(
     std::vector<std::vector<cv::Point2i>> *left_eye_landmarks_list,
     std::vector<std::vector<cv::Point2i>> *right_eye_landmarks_list) {
 
+  std::vector<std::deque<int>> status_buffer_list;
+  InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+
   std::vector<std::string> kThemeMsgList(0);
-#if 1
   // なぜか下記が実行できなくてキレそう（キレてる）
   // kThemeMsgList.push_back(std::string("に勝て！"));
   // kThemeMsgList.push_back(std::string("に負けろ！"));
@@ -162,24 +201,6 @@ absl::Status RunMPPGraph(
   kThemeMsgList.push_back(std::string(": Win this gesture!"));
   kThemeMsgList.push_back(std::string(": Lose this gesture!"));
   kThemeMsgList.push_back(std::string(": Draw this gesture!"));
-#else
-  // ref: https://code-database.com/knowledges/123
-  std::ifstream ifs;
-  ifs.open("mediapipe/examples/desktop/janken_pipeline/msg_list.txt", std::ios::in);
-  std::string reading_line_buffer;
-  setlocale(LC_CTYPE, "ja_JP.UTF-8");
-
-  while(std::getline(ifs, reading_line_buffer)){
-      size_t capacity = strlen(reading_line_buffer.c_str()) + 1;
-      wchar_t *str2 = (wchar_t *)malloc(sizeof(wchar_t) * capacity);
-
-      // char -> wchar_tの変換
-      int result = mbstowcs(str2, reading_line_buffer.c_str(), capacity);
-
-      std::cout << str2 << std::endl;
-      // kThemeMsgList.push_back(reading_line_buffer);
-  }
-#endif
 
   std::random_device rnd; // 非決定的な乱数生成器
   std::mt19937_64 mt(rnd()); // メルセンヌ・ツイスタの32ビット版、引数は初期シード
@@ -192,6 +213,7 @@ absl::Status RunMPPGraph(
 
   std::vector<mediapipe::NormalizedLandmarkList> landmarks_list;
 
+  // TODO: Move to global field
   std::vector<std::shared_ptr<AbstractHandGestureEstimator>> one_hand_estimator_list = {
     std::make_shared<GuGestureEstimator>(),
     std::make_shared<ChokiGestureEstimator>(),
@@ -249,8 +271,7 @@ absl::Status RunMPPGraph(
     cv::Mat input_frame_mat = mediapipe::formats::MatView(input_frame.get());
     camera_frame.copyTo(input_frame_mat);
 
-    // Send image packet into the graph.
-    // std::cout << "Send image packet into the graph." << std::endl;
+    // Extract landmarks when callback. ---
     size_t frame_timestamp_us =
         (double)cv::getTickCount() / (double)cv::getTickFrequency() * 1e6;
     graph.AddPacketToInputStream(
@@ -260,6 +281,7 @@ absl::Status RunMPPGraph(
     graph.WaitUntilIdle();
 
     cv::Mat landmark_image = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
+    // --- Extract landmarks when callback.
 
     // PostProcess ---
     for (int i = 0; i < landmarks_list.size(); i++) {
@@ -276,7 +298,9 @@ absl::Status RunMPPGraph(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
     // TODO: refactor
-    GestureType pre_recognized_type = GestureType::UNKNOWN;
+    std::vector<int> new_status_list(GestureType::NUM_GESTURES);
+
+    GestureType last_recognized_type = GestureType::UNKNOWN;
     if (landmarks_list.size() == 1) {
       // 片手
       cv::Mat gesture_image;
@@ -292,7 +316,7 @@ absl::Status RunMPPGraph(
           else if (recognized_type == GestureType::PA)
             gesture_image = cv::imread("mediapipe/resources/pa.png");
 
-          pre_recognized_type = recognized_type;
+          last_recognized_type = recognized_type;
         }
       }
       if (gesture_image.empty()) {
@@ -305,8 +329,8 @@ absl::Status RunMPPGraph(
       }
       Overlap(gesture_image, landmark_image, -3,
               camera_frame_raw.rows - 105,
-              std::roundl(camera_frame_raw.cols * 0.2),
-              std::roundl(camera_frame_raw.rows * 0.2));
+              std::roundl(camera_frame_raw.cols * 0.25),
+              std::roundl(camera_frame_raw.rows * 0.25));
       output_frame_display_right = gesture_image;
     }
     else if (landmarks_list.size() == 2) {
@@ -319,7 +343,7 @@ absl::Status RunMPPGraph(
           if (recognized_type == GestureType::HEART)
             gesture_image = cv::imread("mediapipe/resources/heart.png");
 
-          pre_recognized_type = recognized_type;
+          last_recognized_type = recognized_type;
         }
       }
       if (gesture_image.empty()) {
@@ -332,10 +356,37 @@ absl::Status RunMPPGraph(
       }
       Overlap(gesture_image, landmark_image, -3,
               camera_frame_raw.rows - 105,
-              std::roundl(camera_frame_raw.cols * 0.2),
-              std::roundl(camera_frame_raw.rows * 0.2));
+              std::roundl(camera_frame_raw.cols * 0.25),
+              std::roundl(camera_frame_raw.rows * 0.25));
       output_frame_display_right = gesture_image;
     }
+
+    // Write text.
+    if (last_recognized_type != GestureType::UNKNOWN)
+      cv::putText(output_frame_display_right, "Your gesture",
+                  cv::Point(camera_frame_raw.rows / 2 - 100, 30), 2, 0.8,
+                  cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+
+    // Update all status-buffer.
+    new_status_list[last_recognized_type]++;
+    // for (auto &new_status : new_status_list)
+    //   std::cout << new_status << " ";
+    // std::cout << std::endl;
+
+    UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
+
+    std::vector<float> result_list;
+    CalculateStatistics(status_buffer_list, &result_list);
+    GestureType candidate_of_gesture_type = GestureType::UNKNOWN;
+    float max_value = 0;
+    for (int i = 0; i < result_list.size(); i++) {
+      if (max_value < result_list[i]) {
+        candidate_of_gesture_type = GestureType(i);
+        max_value = result_list[i];
+      }
+    }
+    std::cout << "GestureType: " << candidate_of_gesture_type << std::endl;
+
     landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
 
     cv::Mat output_frame_display;

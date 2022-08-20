@@ -15,6 +15,7 @@ enum GestureType {
     CHOKI = 2,
     PA = 3,
     HEART = 4,
+    NUM_GESTURES = 5,
 };
 
 class AbstractHandGestureEstimator {

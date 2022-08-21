@@ -212,6 +212,7 @@ absl::Status RunMPPGraph(
   kOperationImageMap[ResultType::LOSE] = cv::imread("mediapipe/resources/loss_operation.png");
   kOperationImageMap[ResultType::DRAW] = cv::imread("mediapipe/resources/draw_operation.png");
 
+  const cv::Mat description_image = cv::imread("mediapipe/resources/description.png");
   const cv::Mat your_hand_image = cv::imread("mediapipe/resources/your_hand.png");
 
   std::random_device rnd; // 非決定的な乱数生成器
@@ -322,7 +323,13 @@ absl::Status RunMPPGraph(
     std::vector<int> new_status_list((int)(JankenGestureType::NUM_GESTURES));
 
     auto current_recognized_type = JankenGestureType::UNKNOWN;
-    if (landmarks_list.size() == 1) {
+    if (landmarks_list.size() == 0) {
+      Overlap(output_frame_display_right, description_image,
+              (camera_frame_raw.rows - description_image.cols) / 2,
+              (camera_frame_raw.rows - description_image.rows) / 2,
+              description_image.cols, description_image.rows);
+    }
+    else if (landmarks_list.size() == 1) {
       // 片手
       cv::Mat gesture_image;
       for (auto &estimator : one_hand_estimator_list) {
@@ -342,10 +349,6 @@ absl::Status RunMPPGraph(
         cv::resize(gesture_image, gesture_image,
                    cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
       }
-      // Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
-      //         camera_frame_raw.rows - 110,
-      //         std::roundl(camera_frame_raw.cols * 0.22),
-      //         std::roundl(camera_frame_raw.rows * 0.22));
 
       // 背景を黒塗り
       output_frame_display_right = cv::Mat::zeros(
@@ -362,12 +365,6 @@ absl::Status RunMPPGraph(
           std::roundl(landmark_image.rows * resize_ratio);
       Overlap(output_frame_display_right, landmark_image, 0, (camera_frame_raw.rows - resized_landmark_image_height) / 2,
               resized_landmark_image_width, resized_landmark_image_height);
-
-      // 上記画像の上に今のフレームの情報だけで判断したジェスチャーを描画
-      Overlap(output_frame_display_right, gesture_image, -10,
-              camera_frame_raw.rows - 95,
-              std::roundl(gesture_image.cols * 0.22),
-              std::roundl(gesture_image.rows * 0.22));
     }
     // else if (landmarks_list.size() == 2) {
     //   // 両手
@@ -396,10 +393,19 @@ absl::Status RunMPPGraph(
     // }
 
     // Write text.
-    if (current_recognized_type != JankenGestureType::UNKNOWN)
-      Overlap(output_frame_display_right, your_hand_image,
-              (camera_frame_raw.rows - your_hand_image.cols) / 2, 0,
-              your_hand_image.cols, your_hand_image.rows);
+    if (current_recognized_type != JankenGestureType::UNKNOWN) {
+      cv::Mat gesture_image = kGestureImageMap[current_recognized_type];
+      cv::resize(gesture_image, gesture_image,
+                 cv::Size(your_hand_image.rows, your_hand_image.rows));
+
+      cv::Mat overlap_image;
+      cv::hconcat(your_hand_image, gesture_image, overlap_image);
+
+      // 全体の横幅がカメラフレームの縦幅と同じなので注意。
+      Overlap(output_frame_display_right, overlap_image,
+              (camera_frame_raw.rows - overlap_image.cols) / 2, 0,
+              overlap_image.cols, overlap_image.rows);
+    }
 
     // Update all status-buffer.
     new_status_list[(int)(current_recognized_type)]++;
@@ -441,11 +447,11 @@ absl::Status RunMPPGraph(
       const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
           candidate_of_gesture_type, opposite_gesture);
 
-      std::cout << "Current result, Your gesture, Opposite gesture, Operation: "
-                << (int)(current_result_type) << ", "
-                << (int)(candidate_of_gesture_type) << ", "
-                << (int)(opposite_gesture) << ", " << (int)(operation)
-                << std::endl;
+      // std::cout << "Current result, Your gesture, Opposite gesture, Operation: "
+      //           << (int)(current_result_type) << ", "
+      //           << (int)(candidate_of_gesture_type) << ", "
+      //           << (int)(opposite_gesture) << ", " << (int)(operation)
+      //           << std::endl;
 
       // スコアを更新するタイミングでは次のお題を表示しない。
       if (current_result_type == operation && 0.6 < max_score) {

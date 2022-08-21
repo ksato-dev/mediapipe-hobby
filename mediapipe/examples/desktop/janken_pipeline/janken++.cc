@@ -21,6 +21,7 @@
 #include <random>
 #include <fstream>
 #include <deque>
+#include <thread>
 // #include <locale.h>
 // #include <wchar.h>
 
@@ -383,58 +384,9 @@ absl::Status RunMPPGraph(
     //   std::cout << new_status << " ";
     // std::cout << std::endl;
 
-    UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
-
-    std::vector<float> result_list;
-    CalculateStatistics(status_buffer_list, &result_list);
-    JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
-    float max_score = 0;
-    for (int i = 0; i < result_list.size(); i++) {
-      if (max_score < result_list[i]) {
-        candidate_of_gesture_type = JankenGestureType(i);
-        max_score = result_list[i];
-      }
-    }
-    // std::cout << "GestureType: " << (int)(candidate_of_gesture_type) << std::endl;
-
-    // Judgement
-    const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
-        candidate_of_gesture_type, opposite_gesture);
-
-    std::cout << "Current result, Your gesture, Opposite gesture, Operation: "
-              << (int)(current_result_type) << ", "
-              << (int)(candidate_of_gesture_type) << ", "
-              << (int)(opposite_gesture) << ", " << (int)(operation)
-              << std::endl;
-
-    if (current_result_type == operation && 0.6 < max_score) {
-      win_cnt++;
-
-      // 相手の次の手は今のと重複しないようにする。
-      JankenGestureType pre_oppo_gesture = opposite_gesture;
-      while (pre_oppo_gesture == opposite_gesture)
-        opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
-
-      operation = ResultType(operation_rand_n(mt));
-
-      time_since_resetting = 0;
-    }
-
-    landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
-
-    cv::Mat output_frame_display_left;
-    // CreateWhiteImage(cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
-    //                  &output_frame_display_left);
-    output_frame_display_left = kGestureImageMap[opposite_gesture];
-    cv::resize(output_frame_display_left, output_frame_display_left,
-               cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-    // output_frame_display_left = cv::Mat::zeros(
-    //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
-
-    cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(15, 35), 2, 1.0,
-                cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-    cv::putText(output_frame_display_left, std::string("Score: ") + std::to_string(win_cnt), cv::Point(20, camera_frame_raw.rows - 20), 2, 1.0,
-                cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+    // 合否結果を表示しているときは更新しない。
+    cv::Mat output_frame_display_left = cv::Mat::zeros(
+        cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
     if (time_since_resetting < 10) {
       cv::circle(
@@ -443,6 +395,64 @@ absl::Status RunMPPGraph(
           cv::Scalar(0, 255, 0), 5, cv::LINE_4);
       time_since_resetting++;
     }
+    else {
+      UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
+
+      std::vector<float> result_list;
+      CalculateStatistics(status_buffer_list, &result_list);
+      JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
+      float max_score = 0;
+      for (int i = 0; i < result_list.size(); i++) {
+        if (max_score < result_list[i]) {
+          candidate_of_gesture_type = JankenGestureType(i);
+          max_score = result_list[i];
+        }
+      }
+      // std::cout << "GestureType: " << (int)(candidate_of_gesture_type) << std::endl;
+
+      // Judgement
+      const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
+          candidate_of_gesture_type, opposite_gesture);
+
+      std::cout << "Current result, Your gesture, Opposite gesture, Operation: "
+                << (int)(current_result_type) << ", "
+                << (int)(candidate_of_gesture_type) << ", "
+                << (int)(opposite_gesture) << ", " << (int)(operation)
+                << std::endl;
+
+      // スコアを更新するタイミングでは次のお題を表示しない。
+      if (current_result_type == operation && 0.6 < max_score) {
+        win_cnt++;
+
+        // 相手の次の手は今のと重複しないようにする。
+        JankenGestureType pre_oppo_gesture = opposite_gesture;
+        while (pre_oppo_gesture == opposite_gesture)
+          opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+
+        operation = ResultType(operation_rand_n(mt));
+
+        time_since_resetting = 0;
+      }
+      else {
+        // CreateWhiteImage(cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
+        //                  &output_frame_display_left);
+        output_frame_display_left = kGestureImageMap[opposite_gesture];
+        cv::resize(output_frame_display_left, output_frame_display_left,
+                   cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
+        // output_frame_display_left = cv::Mat::zeros(
+        //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+
+        cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(15, 35), 2, 1.0,
+                    cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+      }
+      landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
+    }
+
+    // delay
+    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    cv::putText(output_frame_display_left, std::string("Score: ") + std::to_string(win_cnt), cv::Point(20, camera_frame_raw.rows - 20), 2, 1.0,
+                cv::Scalar(0, 255, 0), 2, cv::LINE_4);
     // cv::circle(*output_frame_display_right, cv::Point(x, y), 2, cv::Scalar(0, 0, 255), 4,
     //            cv::LINE_4);
     // --- 左の表示

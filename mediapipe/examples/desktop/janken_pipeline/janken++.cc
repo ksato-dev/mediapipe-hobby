@@ -200,7 +200,7 @@ absl::Status RunMPPGraph(
   std::vector<std::deque<int>> status_buffer_list;
   InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
 
-  std::map<ResultType, std::string> kOperationMsgMap;
+  std::map<ResultType, cv::Mat> kOperationImageMap;
   // なぜか下記が実行できなくてキレそう（キレてる）
   // kOperationMsgList.push_back(std::string("に勝て！"));
   // kOperationMsgList.push_back(std::string("に負けろ！"));
@@ -208,16 +208,18 @@ absl::Status RunMPPGraph(
   // kOperationMsgList.push_back(std::string("aaa"));  // 英語はいける。やっぱ日本語はクソ
 
   // 英語版
-  kOperationMsgMap[ResultType::WIN] = std::string("Win this gesture!");
-  kOperationMsgMap[ResultType::LOSE] = std::string("Lose this gesture!");
-  kOperationMsgMap[ResultType::DRAW] = std::string("Draw this gesture!");
+  kOperationImageMap[ResultType::WIN] = cv::imread("mediapipe/resources/win_operation.png");
+  kOperationImageMap[ResultType::LOSE] = cv::imread("mediapipe/resources/loss_operation.png");
+  kOperationImageMap[ResultType::DRAW] = cv::imread("mediapipe/resources/draw_operation.png");
+
+  const cv::Mat your_hand_image = cv::imread("mediapipe/resources/your_hand.png");
 
   std::random_device rnd; // 非決定的な乱数生成器
   std::mt19937_64 mt(rnd()); // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
-  // std::uniform_int_distribution<> operation_rand_n(
-  //     1, (int)(ResultType::NUM_RESULT_TYPES) - 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> operation_rand_n(
-      1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+      1, (int)(ResultType::NUM_RESULT_TYPES) - 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+  // std::uniform_int_distribution<> operation_rand_n(
+  //     1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> opposite_gesture_rand_n(
       1, (int)(JankenGestureType::NUM_GESTURES) - 1); // [1, n] 範囲の一様乱数, UNKNOWMN はスキップ
 
@@ -340,11 +342,32 @@ absl::Status RunMPPGraph(
         cv::resize(gesture_image, gesture_image,
                    cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
       }
-      Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
-              camera_frame_raw.rows - 110,
-              std::roundl(camera_frame_raw.cols * 0.22),
-              std::roundl(camera_frame_raw.rows * 0.22));
-      output_frame_display_right = gesture_image;
+      // Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
+      //         camera_frame_raw.rows - 110,
+      //         std::roundl(camera_frame_raw.cols * 0.22),
+      //         std::roundl(camera_frame_raw.rows * 0.22));
+
+      // 背景を黒塗り
+      output_frame_display_right = cv::Mat::zeros(
+            cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+
+      // 背景の上に手のランドマークを描画
+      const float resize_ratio =
+          ((float)camera_frame_raw.rows /
+           landmark_image
+               .cols);  // カメラの高さの合わせてランドマーク画像の幅をリサイズするための倍率
+      const int resized_landmark_image_width =
+          std::roundl(landmark_image.cols * resize_ratio);
+      const int resized_landmark_image_height =
+          std::roundl(landmark_image.rows * resize_ratio);
+      Overlap(output_frame_display_right, landmark_image, 0, (camera_frame_raw.rows - resized_landmark_image_height) / 2,
+              resized_landmark_image_width, resized_landmark_image_height);
+
+      // 上記画像の上に今のフレームの情報だけで判断したジェスチャーを描画
+      Overlap(output_frame_display_right, gesture_image, -10,
+              camera_frame_raw.rows - 95,
+              std::roundl(gesture_image.cols * 0.22),
+              std::roundl(gesture_image.rows * 0.22));
     }
     // else if (landmarks_list.size() == 2) {
     //   // 両手
@@ -374,9 +397,9 @@ absl::Status RunMPPGraph(
 
     // Write text.
     if (current_recognized_type != JankenGestureType::UNKNOWN)
-      cv::putText(output_frame_display_right, "Your gesture",
-                  cv::Point(camera_frame_raw.rows / 2 - 100, 35), 2, 1.0,
-                  cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+      Overlap(output_frame_display_right, your_hand_image,
+              (camera_frame_raw.rows - your_hand_image.cols) / 2, 0,
+              your_hand_image.cols, your_hand_image.rows);
 
     // Update all status-buffer.
     new_status_list[(int)(current_recognized_type)]++;
@@ -384,11 +407,14 @@ absl::Status RunMPPGraph(
     //   std::cout << new_status << " ";
     // std::cout << std::endl;
 
-    // 合否結果を表示しているときは更新しない。
     cv::Mat output_frame_display_left = cv::Mat::zeros(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
     if (time_since_resetting < 10) {
+      // 合否表示注はバッファをクリアしておく。
+      status_buffer_list = std::vector<std::deque<int>>();
+      InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+
       cv::circle(
           output_frame_display_left,
           cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2), 100,
@@ -396,6 +422,7 @@ absl::Status RunMPPGraph(
       time_since_resetting++;
     }
     else {
+      // 合否結果を表示しているときは更新しない。
       UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
 
       std::vector<float> result_list;
@@ -439,11 +466,12 @@ absl::Status RunMPPGraph(
         output_frame_display_left = kGestureImageMap[opposite_gesture];
         cv::resize(output_frame_display_left, output_frame_display_left,
                    cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-        // output_frame_display_left = cv::Mat::zeros(
-        //     cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+        auto &ope_image = kOperationImageMap[operation];
 
-        cv::putText(output_frame_display_left, kOperationMsgMap[operation], cv::Point(15, 35), 2, 1.0,
-                    cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+        // 全体の横幅がカメラフレームの縦幅と同じなので注意。
+        Overlap(output_frame_display_left, ope_image,
+                (camera_frame_raw.rows - ope_image.cols) / 2, 0, ope_image.cols,
+                ope_image.rows);
       }
       landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
     }

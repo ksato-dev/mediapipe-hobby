@@ -1,13 +1,13 @@
 
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 
-void StatusBufferProcessor::InitializeGestureStatusBufferList(
+void StatusBufferProcessor::Initialize(
     const int &buffer_size, std::vector<StatusBuffer> *status_buffer_list) {
   for (int i = 0; i < (int)(JankenGestureType::NUM_GESTURES); i++)
     status_buffer_list->push_back(StatusBuffer(buffer_size, 0));
 }
 
-void StatusBufferProcessor::UpdateGestureStatusBufferList(
+void StatusBufferProcessor::Update(
     const std::vector<bool> &new_status_list,
     std::vector<StatusBuffer> *status_buffer_list) {
   const int buffer_size = status_buffer_list->at(0).size();

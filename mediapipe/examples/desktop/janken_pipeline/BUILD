@@ -33,6 +33,9 @@ cc_binary(
         "//mediapipe/examples/desktop/janken_pipeline:gesture_estimator",
         "//mediapipe/examples/desktop/janken_pipeline:janken_judgement",
         "//mediapipe/examples/desktop/janken_pipeline:status_buffer_processor",
+        "//mediapipe/examples/desktop/janken_pipeline:vis_utils",
+        "//mediapipe/examples/desktop/janken_pipeline:post_processor",
+
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:image_frame_opencv",
@@ -79,6 +82,41 @@ cc_library(
     deps = [
         "//mediapipe/calculators/util:detections_to_rects_calculator",
         "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "vis_utils",
+    srcs = ["vis_utils.cc"],
+    hdrs = ["vis_utils.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/calculators/util:detections_to_rects_calculator",
+        "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+        "//mediapipe/framework/port:opencv_highgui",
+        "//mediapipe/framework/port:opencv_imgproc",
+        "//mediapipe/framework/port:opencv_video",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "post_processor",
+    srcs = ["post_processor.cc"],
+    hdrs = ["post_processor.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/examples/desktop/janken_pipeline:gesture_estimator",
+        "//mediapipe/examples/desktop/janken_pipeline:janken_judgement",
+        "//mediapipe/examples/desktop/janken_pipeline:status_buffer_processor",
+        "//mediapipe/examples/desktop/janken_pipeline:vis_utils",
+
+        "//mediapipe/calculators/util:detections_to_rects_calculator",
+        "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+        "//mediapipe/framework/port:opencv_highgui",
+        "//mediapipe/framework/port:opencv_imgproc",
+        "//mediapipe/framework/port:opencv_video",
     ],
     alwayslink = 1,
 )

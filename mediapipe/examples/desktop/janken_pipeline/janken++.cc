@@ -33,6 +33,8 @@
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
+#include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
+#include "mediapipe/examples/desktop/janken_pipeline/post_processor.h"
 
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
@@ -52,87 +54,12 @@ constexpr char kInputStream[] = "input_video";
 constexpr char kOutputStream[] = "landmarks";
 constexpr char kWindowName[] = "Janken++ (beta version)";
 
-const double kCvWaitkeyEsc = 27;
-const double kCvWaitkeySpase = 32;
-const double kLimitTimeSec = 200.0;
+const int kCvWaitkeyEsc = 27;
+const int kCvWaitkeySpase = 32;
+const double kLimitTimeSec = 20.0;
 const int kBufferSize = 23;
 
-const std::vector<std::vector<int>> kConnectionList = {
-    {0, 1},   {1, 2},   {2, 3},   {3, 4},   {5, 6},   {6, 7},   {7, 8},
-    {5, 9},   {9, 10},  {10, 11}, {11, 12}, {9, 13},  {13, 14}, {14, 15},
-    {15, 16}, {13, 17}, {17, 18}, {18, 19}, {19, 20}, {0, 17},  {5, 1},
-};
-
 std::map<JankenGestureType, cv::Mat> kGestureImageMap;
-
-// TODO: Convert functions below to external class. ---
-// 白画像を作る関数
-void CreateWhiteImage(const cv::Size &size, cv::Mat *output_image) {
-  *output_image = cv::Mat::zeros(size, CV_8UC3);
-  int cols = output_image->cols;
-  int rows = output_image->rows;
-  for (int j = 0; j < rows; j++) {
-    for (int i = 0; i < cols; i++) {
-      output_image->at<cv::Vec3b>(j, i)[0] = 255;  // 青
-      output_image->at<cv::Vec3b>(j, i)[1] = 255;  // 緑
-      output_image->at<cv::Vec3b>(j, i)[2] = 255;  // 赤
-    }
-  }
-}
-
-// 画像を画像に貼り付ける関数
-// ref: https://kougaku-navi.hatenablog.com/entry/20160108/p1
-void Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width, int height) {
-  cv::Mat resized_img;
-  cv::resize(src, resized_img, cv::Size(width, height));
-
-  if (x >= dst.cols || y >= dst.rows) return;
-  int w = (x >= 0) ? std::min(dst.cols - x, resized_img.cols)
-                   : std::min(std::max(resized_img.cols + x, 0), dst.cols);
-  int h = (y >= 0) ? std::min(dst.rows - y, resized_img.rows)
-                   : std::min(std::max(resized_img.rows + y, 0), dst.rows);
-  int u = (x >= 0) ? 0 : std::min(-x, resized_img.cols - 1);
-  int v = (y >= 0) ? 0 : std::min(-y, resized_img.rows - 1);
-  int px = std::max(x, 0);
-  int py = std::max(y, 0);
-
-  cv::Mat roi_dst = dst(cv::Rect(px, py, w, h));
-  cv::Mat roi_resized = resized_img(cv::Rect(u, v, w, h));
-  roi_resized.copyTo(roi_dst);
-}
-
-void DrawNodePoints(const mediapipe::NormalizedLandmarkList &landmarks,
-                    const cv::Mat &camera_frame_raw,
-                    cv::Mat *output_frame_display_right) {
-  for (int j = 0; j < landmarks.landmark_size(); j++) {
-    auto &landmark = landmarks.landmark(j);
-    int x = int(std::round(landmark.x() * camera_frame_raw.cols));
-    int y = int(std::round(landmark.y() * camera_frame_raw.rows));
-    // std::cout << "x, y = " << x << ", " << y
-    //           << std::endl;
-    cv::circle(*output_frame_display_right, cv::Point(x, y), 2,
-               cv::Scalar(0, 0, 255), 4, cv::LINE_4);
-  }
-}
-
-void DrawFrameLines(const mediapipe::NormalizedLandmarkList &landmarks,
-                    const cv::Mat &camera_frame_raw,
-                    cv::Mat *output_frame_display_right) {
-  // index
-  for (auto &conn : kConnectionList) {
-    auto &landmark1 = landmarks.landmark(conn[0]);
-    int x1 = int(std::round(landmark1.x() * camera_frame_raw.cols));
-    int y1 = int(std::round(landmark1.y() * camera_frame_raw.rows));
-
-    auto &landmark2 = landmarks.landmark(conn[1]);
-    int x2 = int(std::round(landmark2.x() * camera_frame_raw.cols));
-    int y2 = int(std::round(landmark2.y() * camera_frame_raw.rows));
-
-    cv::line(*output_frame_display_right, cv::Point(x1, y1), cv::Point(x2, y2),
-             cv::Scalar(0, 255, 0), 4, cv::LINE_4);
-  }
-}
-// --- Convert functions below to external class.
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -161,17 +88,9 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
 
   int win_cnt = 0;
   std::vector<StatusBuffer> status_buffer_list;
-  StatusBufferProcessor::InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+  StatusBufferProcessor::Initialize(kBufferSize, &status_buffer_list);
 
   std::map<ResultType, cv::Mat> kOperationImageMap;
-  // なぜか下記が実行できなくてキレそう（キレてる）
-  // kOperationMsgList.push_back(std::string("に勝て！"));
-  // kOperationMsgList.push_back(std::string("に負けろ！"));
-  // kOperationMsgList.push_back(std::string("とあいこ！"));
-  // kOperationMsgList.push_back(std::string("aaa"));  //
-  // 英語はいける。やっぱ日本語はクソ
-
-  // 英語版
   kOperationImageMap[ResultType::WIN] =
       cv::imread("mediapipe/resources/win_operation.png");
   kOperationImageMap[ResultType::LOSE] =
@@ -235,7 +154,10 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   MP_RETURN_IF_ERROR(graph.StartRun({}));
 
   cv::VideoCapture capture;
-  capture.open(0);
+  capture.open(
+      0);  // TODO:
+           // 複数カメラ接続している時に自動空いているカメラを使いに行かせる。
+  // TODO: camera size を固定にするか自動にするか決める。
 
   bool grab_frames = true;
 
@@ -243,7 +165,7 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   JankenGestureType opposite_gesture =
       JankenGestureType(opposite_gesture_rand_n(mt));
 
-  int time_since_resetting = 1000;  // 初期値がゼロだとはじめに〇が出てしまう。
+  int num_frames_since_resetting = 1000;  // 初期値がゼロだとはじめに〇が出てしまう。
   auto start_time = std::chrono::system_clock::now();
 
   while (grab_frames) {
@@ -278,47 +200,33 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
                           .At(mediapipe::Timestamp(frame_timestamp_us)));
 
     graph.WaitUntilIdle();
-
-    // cv::Mat landmark_image = cv::Mat::zeros(camera_frame_raw.size(),
-    // CV_8UC3);
-    cv::Mat landmark_image = camera_frame_raw;
-
-#if 0
-    // Blur to proctect privacy. ---
-    for (int i = 0; i < 5; i++)
-      cv::resize(landmark_image, landmark_image,
-                 cv::Size(landmark_image.cols / 2, landmark_image.rows / 2));
-
-    cv::resize(landmark_image, landmark_image,
-               cv::Size(camera_frame_raw.cols, camera_frame_raw.rows));
-    // --- Blur to proctect privacy.
-#endif
-
     // --- Extract landmarks when callback.
 
     // PostProcess ---
+    cv::Mat landmark_image;
+    VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
+
     for (int i = 0; i < landmarks_list.size(); i++) {
       mediapipe::NormalizedLandmarkList &landmarks = landmarks_list[i];
       // draw frame-lines
-      DrawFrameLines(landmarks, camera_frame_raw, &landmark_image);
+      VisUtility::DrawFrameLines(landmarks, landmark_image, &landmark_image);
 
       // draw node-points
-      DrawNodePoints(landmarks, camera_frame_raw, &landmark_image);
+      VisUtility::DrawNodePoints(landmarks, landmark_image, &landmark_image);
     }
 
     cv::Mat output_frame_display_right;
     output_frame_display_right = cv::Mat::zeros(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-    // TODO: refactor
     std::vector<bool> new_status_list((int)(JankenGestureType::NUM_GESTURES));
 
     auto current_recognized_type = JankenGestureType::UNKNOWN;
     if (landmarks_list.size() == 0) {
-      Overlap(output_frame_display_right, description_image,
-              (camera_frame_raw.rows - description_image.cols) / 2,
-              (camera_frame_raw.rows - description_image.rows) / 2,
-              description_image.cols, description_image.rows);
+      VisUtility::Overlap(output_frame_display_right, description_image,
+                          (camera_frame_raw.rows - description_image.cols) / 2,
+                          (camera_frame_raw.rows - description_image.rows) / 2,
+                          description_image.cols, description_image.rows);
     } else {
       // else if (landmarks_list.size() == 1) {
       // 片手 -> 両手でもおｋにした。
@@ -326,11 +234,11 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
       for (auto &estimator : hand_estimator_list) {
         // std::cout << landmarks_list[0].landmark_size() << std::endl;
         estimator->Initialize();
-        const JankenGestureType recognized_type =
+        const JankenGestureType temp_recognized_type =
             estimator->Recognize(landmarks_list);
-        if (recognized_type != JankenGestureType::UNKNOWN) {
-          gesture_image = kGestureImageMap[recognized_type];
-          current_recognized_type = recognized_type;
+        if (temp_recognized_type != JankenGestureType::UNKNOWN) {
+          gesture_image = kGestureImageMap[temp_recognized_type];
+          current_recognized_type = temp_recognized_type;
         }
       }
       if (gesture_image.empty()) {
@@ -346,44 +254,18 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
       // 背景の上に手のランドマークを描画
+      // カメラの高さの合わせてランドマーク画像の幅をリサイズするための倍率
       const float resize_ratio =
-          ((float)camera_frame_raw.rows /
-           landmark_image
-               .cols);  // カメラの高さの合わせてランドマーク画像の幅をリサイズするための倍率
+          ((float)camera_frame_raw.rows / landmark_image.cols);
       const int resized_landmark_image_width =
           std::roundl(landmark_image.cols * resize_ratio);
       const int resized_landmark_image_height =
           std::roundl(landmark_image.rows * resize_ratio);
-      Overlap(output_frame_display_right, landmark_image, 0,
-              (camera_frame_raw.rows - resized_landmark_image_height) / 2,
-              resized_landmark_image_width, resized_landmark_image_height);
+      VisUtility::Overlap(
+          output_frame_display_right, landmark_image, 0,
+          (camera_frame_raw.rows - resized_landmark_image_height) / 2,
+          resized_landmark_image_width, resized_landmark_image_height);
     }
-    // else if (landmarks_list.size() == 2) {
-    //   // 両手
-    //   cv::Mat gesture_image;
-    //   for (auto &estimator : two_hands_estimator_list) {
-    //     estimator->Initialize();
-    //     const GestureType recognized_type =
-    //     estimator->Recognize(landmarks_list); if (recognized_type !=
-    //     GestureType::UNKNOWN) {
-    //       gesture_image = kGestureImageMap[recognized_type];
-    //       current_recognized_type = recognized_type;
-    //     }
-    //   }
-    //   if (gesture_image.empty()) {
-    //     gesture_image = cv::Mat::zeros(
-    //         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
-    //   }
-    //   else {
-    //     cv::resize(gesture_image, gesture_image,
-    //                cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-    //   }
-    //   Overlap(gesture_image, landmark_image, camera_frame_raw.cols - 300,
-    //           camera_frame_raw.rows - 110,
-    //           std::roundl(camera_frame_raw.cols * 0.22),
-    //           std::roundl(camera_frame_raw.rows * 0.22));
-    //   output_frame_display_right = gesture_image;
-    // }
 
     // Write text.
     if (current_recognized_type != JankenGestureType::UNKNOWN) {
@@ -395,45 +277,44 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
       cv::hconcat(your_hand_image, gesture_image, overlap_image);
 
       // 全体の横幅がカメラフレームの縦幅と同じなので注意。
-      Overlap(output_frame_display_right, overlap_image,
-              (camera_frame_raw.rows - overlap_image.cols) / 2, 0,
-              overlap_image.cols, overlap_image.rows);
+      VisUtility::Overlap(output_frame_display_right, overlap_image,
+                          (camera_frame_raw.rows - overlap_image.cols) / 2, 0,
+                          overlap_image.cols, overlap_image.rows);
     }
-    cv::putText(output_frame_display_right, std::string("Finish: <ESC>"),
-                cv::Point(camera_frame_raw.rows - 140, camera_frame_raw.rows - 10),
-                1, 1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
+    cv::putText(
+        output_frame_display_right, std::string("Finish: <ESC>"),
+        cv::Point(camera_frame_raw.rows - 140, camera_frame_raw.rows - 10), 1,
+        1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
     // Update all status-buffer.
     new_status_list[(int)(current_recognized_type)] = true;
-    // for (auto &new_status : new_status_list)
-    //   std::cout << new_status << " ";
-    // std::cout << std::endl;
 
     cv::Mat output_frame_display_left = cv::Mat::zeros(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-    if (time_since_resetting < 10) {
+    if (num_frames_since_resetting < 10) {
       // 合否表示注はバッファをクリアしておく。
       status_buffer_list = std::vector<StatusBuffer>();
-      StatusBufferProcessor::InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+      StatusBufferProcessor::Initialize(kBufferSize, &status_buffer_list);
 
       cv::circle(
           output_frame_display_left,
           cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2), 100,
           cv::Scalar(0, 255, 0), 5, cv::LINE_4);
-      time_since_resetting++;
+      num_frames_since_resetting++;
     } else {
       // 合否結果を表示しているときは更新しない。
-      StatusBufferProcessor::UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
+      StatusBufferProcessor::Update(new_status_list, &status_buffer_list);
 
-      std::vector<float> result_list;
-      StatusBufferProcessor::CalculateStatistics(status_buffer_list, &result_list);
+      std::vector<float> score_list;
+      StatusBufferProcessor::CalculateStatistics(status_buffer_list,
+                                                 &score_list);
       JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
       float max_score = 0;
-      for (int i = 0; i < result_list.size(); i++) {
-        if (max_score < result_list[i]) {
+      for (int i = 0; i < score_list.size(); i++) {
+        if (max_score < score_list[i]) {
           candidate_of_gesture_type = JankenGestureType(i);
-          max_score = result_list[i];
+          max_score = score_list[i];
         }
       }
       // std::cout << "GestureType: " << (int)(candidate_of_gesture_type) <<
@@ -476,15 +357,7 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
           }
         }
 
-        // ResultType next_result_type = current_result_type;
-        // while (candidate_of_gesture_type == opposite_gesture &&
-        //        current_result_type == next_result_type) {
-        //   opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
-        //   next_result_type = JankenJudgement::JudgeNormalJanken(
-        //       candidate_of_gesture_type, opposite_gesture);
-        // }
-
-        time_since_resetting = 0;
+        num_frames_since_resetting = 0;
       } else {
         // CreateWhiteImage(cv::Size(camera_frame_raw.rows,
         // camera_frame_raw.rows),
@@ -495,9 +368,9 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
         auto &ope_image = kOperationImageMap[operation];
 
         // 全体の横幅がカメラフレームの縦幅と同じなので注意。
-        Overlap(output_frame_display_left, ope_image,
-                (camera_frame_raw.rows - ope_image.cols) / 2, 0, ope_image.cols,
-                ope_image.rows);
+        VisUtility::Overlap(output_frame_display_left, ope_image,
+                            (camera_frame_raw.rows - ope_image.cols) / 2, 0,
+                            ope_image.cols, ope_image.rows);
       }
       landmarks_list =
           std::vector<mediapipe::NormalizedLandmarkList>();  // reset
@@ -597,10 +470,6 @@ int main(int argc, char **argv) {
 
   const std::string calculator_graph_config_file =
       "mediapipe/graphs/janken_pipeline/hand_tracking_desktop_live.pbtxt";
-  // const cv::Mat camera_frame_raw =
-  // cv::imread("C:\\resource\\image\\index.jpg");
-  std::vector<std::vector<cv::Point2i>> *left_eye_landmarks_list;
-  std::vector<std::vector<cv::Point2i>> *right_eye_landmarks_list;
 
   absl::Status run_status = RunMPPGraph(calculator_graph_config_file);
 

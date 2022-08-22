@@ -134,60 +134,60 @@ const JankenGestureType PaGestureEstimator::Recognize(
     return ret_type;
 }
 
-// const JankenGestureType HeartGestureEstimator::Recognize(
-//     const std::vector<mediapipe::NormalizedLandmarkList> &hand_landmarks_list) {
-//     if (hand_landmarks_list.size() != 2) return JankenGestureType::UNKNOWN;
-//     auto &landms1 = hand_landmarks_list[0];
-//     auto &landms2 = hand_landmarks_list[1];
+const JankenGestureType HeartGestureEstimator::Recognize(
+    const std::vector<mediapipe::NormalizedLandmarkList> &hand_landmarks_list) {
+    if (hand_landmarks_list.size() != 2) return JankenGestureType::UNKNOWN;
+    auto &landms1 = hand_landmarks_list[0];
+    auto &landms2 = hand_landmarks_list[1];
 
-//     const float eps = 0.10;
+    const float eps = 0.10;
 
-//     const bool thumb_nodes_status1 =
-//         abs(landms1.landmark(4).x() - landms2.landmark(4).x()) < eps;
-//     const bool thumb_nodes_status2 =
-//         (landms1.landmark(8).y() < landms1.landmark(4).y()) &&
-//         (landms2.landmark(8).y() < landms2.landmark(4).y()) &&
-//         (landms1.landmark(12).y() < landms1.landmark(4).y()) &&
-//         (landms2.landmark(12).y() < landms2.landmark(4).y()) &&
-//         (landms1.landmark(16).y() < landms1.landmark(4).y()) &&
-//         (landms2.landmark(16).y() < landms2.landmark(4).y()) &&
-//         (landms1.landmark(20).y() < landms1.landmark(4).y()) &&
-//         (landms2.landmark(20).y() < landms2.landmark(4).y());
+    const bool thumb_nodes_status1 =
+        abs(landms1.landmark(4).x() - landms2.landmark(4).x()) < eps;
+    const bool thumb_nodes_status2 =
+        (landms1.landmark(8).y() < landms1.landmark(4).y()) &&
+        (landms2.landmark(8).y() < landms2.landmark(4).y()) &&
+        (landms1.landmark(12).y() < landms1.landmark(4).y()) &&
+        (landms2.landmark(12).y() < landms2.landmark(4).y()) &&
+        (landms1.landmark(16).y() < landms1.landmark(4).y()) &&
+        (landms2.landmark(16).y() < landms2.landmark(4).y()) &&
+        (landms1.landmark(20).y() < landms1.landmark(4).y()) &&
+        (landms2.landmark(20).y() < landms2.landmark(4).y());
 
-//     const bool index_nodes_status1 =
-//         abs(landms1.landmark(8).x() - landms2.landmark(8).x()) < eps;
-//     const bool index_nodes_status2 =
-//         (landms1.landmark(7).y() < landms1.landmark(8).y()) &&
-//         (landms2.landmark(7).y() < landms2.landmark(8).y());
+    const bool index_nodes_status1 =
+        abs(landms1.landmark(8).x() - landms2.landmark(8).x()) < eps;
+    const bool index_nodes_status2 =
+        (landms1.landmark(7).y() < landms1.landmark(8).y()) &&
+        (landms2.landmark(7).y() < landms2.landmark(8).y());
 
-//     const bool middle_nodes_status1 =
-//         abs(landms1.landmark(12).x() - landms2.landmark(12).x()) < eps;
-//     const bool middle_nodes_status2 =
-//         (landms1.landmark(11).y() < landms1.landmark(12).y()) &&
-//         (landms2.landmark(11).y() < landms2.landmark(12).y());
+    const bool middle_nodes_status1 =
+        abs(landms1.landmark(12).x() - landms2.landmark(12).x()) < eps;
+    const bool middle_nodes_status2 =
+        (landms1.landmark(11).y() < landms1.landmark(12).y()) &&
+        (landms2.landmark(11).y() < landms2.landmark(12).y());
 
-//     // ---
-//     const bool ring_nodes_status1 =
-//         abs(landms1.landmark(16).x() - landms2.landmark(16).x()) < eps;
-//     const bool ring_nodes_status2 =
-//         (landms1.landmark(15).y() < landms1.landmark(16).y()) &&
-//         (landms2.landmark(15).y() < landms2.landmark(16).y());
+    // ---
+    const bool ring_nodes_status1 =
+        abs(landms1.landmark(16).x() - landms2.landmark(16).x()) < eps;
+    const bool ring_nodes_status2 =
+        (landms1.landmark(15).y() < landms1.landmark(16).y()) &&
+        (landms2.landmark(15).y() < landms2.landmark(16).y());
 
-//     // ---
-//     const bool pinky_nodes_status1 =
-//         abs(landms1.landmark(20).x() - landms2.landmark(20).x()) < eps;
-//     // 第１関節と第２関節
-//     const bool pinky_nodes_status2 =
-//         (landms1.landmark(19).y() < landms1.landmark(20).y()) &&
-//         (landms2.landmark(19).y() < landms2.landmark(20).y());
+    // ---
+    const bool pinky_nodes_status1 =
+        abs(landms1.landmark(20).x() - landms2.landmark(20).x()) < eps;
+    // 第１関節と第２関節
+    const bool pinky_nodes_status2 =
+        (landms1.landmark(19).y() < landms1.landmark(20).y()) &&
+        (landms2.landmark(19).y() < landms2.landmark(20).y());
 
-//     JankenGestureType ret_type = JankenGestureType::UNKNOWN;
-//     if ((thumb_nodes_status1 && thumb_nodes_status2) &&
-//         ((index_nodes_status1 && index_nodes_status2) &&
-//          (middle_nodes_status1 && middle_nodes_status2) &&
-//          (ring_nodes_status1 && ring_nodes_status2) &&
-//          (pinky_nodes_status1 && pinky_nodes_status2)))
-//         ret_type = JankenGestureType::HEART;
+    JankenGestureType ret_type = JankenGestureType::UNKNOWN;
+    if ((thumb_nodes_status1 && thumb_nodes_status2) &&
+        ((index_nodes_status1 && index_nodes_status2) &&
+         (middle_nodes_status1 && middle_nodes_status2) &&
+         (ring_nodes_status1 && ring_nodes_status2) &&
+         (pinky_nodes_status1 && pinky_nodes_status2)))
+        ret_type = JankenGestureType::HEART;
 
-//     return ret_type;
-// }
+    return ret_type;
+}

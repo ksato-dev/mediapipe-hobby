@@ -32,6 +32,8 @@
 #include "absl/flags/parse.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
+#include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
+
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
@@ -52,50 +54,18 @@ constexpr char kWindowName[] = "Janken++ (beta version)";
 
 const double kCvWaitkeyEsc = 27;
 const double kCvWaitkeySpase = 32;
-const double kLimitTimeSec = 20.0;
+const double kLimitTimeSec = 200.0;
 const int kBufferSize = 23;
 
 const std::vector<std::vector<int>> kConnectionList = {
-    {0, 1},   {1, 2},   {2, 3},   {3, 4},   {0, 5},   {5, 6},   {6, 7},
-    {7, 8},   {5, 9},   {9, 10},  {10, 11}, {11, 12}, {9, 13},  {13, 14},
-    {14, 15}, {15, 16}, {13, 17}, {17, 18}, {18, 19}, {19, 20}, {0, 17},
+    {0, 1},   {1, 2},   {2, 3},   {3, 4},   {5, 6},   {6, 7},   {7, 8},
+    {5, 9},   {9, 10},  {10, 11}, {11, 12}, {9, 13},  {13, 14}, {14, 15},
+    {15, 16}, {13, 17}, {17, 18}, {18, 19}, {19, 20}, {0, 17},  {5, 1},
 };
 
 std::map<JankenGestureType, cv::Mat> kGestureImageMap;
 
-// ステータスバッファー更新
-// TODO: Convert class ---
-void InitializeGestureStatusBufferList(
-    const int &buffer_size, std::vector<std::deque<int>> *status_buffer_list) {
-  for (int i = 0; i < (int)(JankenGestureType::NUM_GESTURES); i++)
-    status_buffer_list->push_back(std::deque<int>(buffer_size, 0));
-}
-
-void UpdateGestureStatusBufferList(
-    const std::vector<int> &new_status_list,
-    std::vector<std::deque<int>> *status_buffer_list) {
-  const int buffer_size = status_buffer_list->at(0).size();
-  for (int i = 0; i < status_buffer_list->size(); i++) {
-    status_buffer_list->at(i).pop_front();
-    status_buffer_list->at(i).push_back(new_status_list[i]);
-  }
-}
-
-void CalculateStatistics(const std::vector<std::deque<int>> &status_buffer_list,
-                         std::vector<float> *result_list) {
-  const int buffer_size = status_buffer_list.at(0).size();
-  for (int i = 0; i < status_buffer_list.size(); i++) {
-    auto &status_buffer = status_buffer_list.at(i);
-    float sum_status = 0.0;
-    for (int j = 0; j < status_buffer.size(); j++) {
-      sum_status += status_buffer.at(j);
-    }
-    const float avg_status = sum_status / (float)buffer_size;
-    result_list->push_back(avg_status);
-  }
-}
-// --- Convert class
-
+// TODO: Convert functions below to external class. ---
 // 白画像を作る関数
 void CreateWhiteImage(const cv::Size &size, cv::Mat *output_image) {
   *output_image = cv::Mat::zeros(size, CV_8UC3);
@@ -162,6 +132,7 @@ void DrawFrameLines(const mediapipe::NormalizedLandmarkList &landmarks,
              cv::Scalar(0, 255, 0), 4, cv::LINE_4);
   }
 }
+// --- Convert functions below to external class.
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -178,23 +149,19 @@ absl::Status Configure(const std::string &calculator_graph_config_file,
   return absl::OkStatus();
 }
 
-absl::Status RunMPPGraph(
-    const std::string &calculator_graph_config_file,
-    // const cv::Mat &camera_frame_raw,
-    std::vector<std::vector<cv::Point2i>> *left_eye_landmarks_list,
-    std::vector<std::vector<cv::Point2i>> *right_eye_landmarks_list) {
+absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   kGestureImageMap[JankenGestureType::GU] =
       cv::imread("mediapipe/resources/gu.png");
   kGestureImageMap[JankenGestureType::CHOKI] =
       cv::imread("mediapipe/resources/choki.png");
   kGestureImageMap[JankenGestureType::PA] =
       cv::imread("mediapipe/resources/pa.png");
-  // kGestureImageMap[JankenGestureType::HEART] =
-  // cv::imread("mediapipe/resources/heart.png");
+  kGestureImageMap[JankenGestureType::HEART] =
+      cv::imread("mediapipe/resources/heart.png");
 
   int win_cnt = 0;
-  std::vector<std::deque<int>> status_buffer_list;
-  InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+  std::vector<StatusBuffer> status_buffer_list;
+  StatusBufferProcessor::InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
 
   std::map<ResultType, cv::Mat> kOperationImageMap;
   // なぜか下記が実行できなくてキレそう（キレてる）
@@ -226,8 +193,9 @@ absl::Status RunMPPGraph(
   // std::uniform_int_distribution<> operation_rand_n(
   //     1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> opposite_gesture_rand_n(
-      1, (int)(JankenGestureType::NUM_GESTURES)-1);  // [1, n] 範囲の一様乱数,
-                                                     // UNKNOWMN はスキップ
+      1,
+      (int)(JankenGestureType::NUM_GESTURES)-2);  // [1, n-1] 範囲の一様乱数,
+                                                  // UNKNOWMN, HEART はスキップ
 
   // std::cout << "called RunMPPGraph" << std::endl;
   mediapipe::CalculatorGraphConfig config;
@@ -237,10 +205,11 @@ absl::Status RunMPPGraph(
 
   // TODO: Move to global field
   std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
-      one_hand_estimator_list = {
+      hand_estimator_list = {
           std::make_shared<GuGestureEstimator>(),
           std::make_shared<ChokiGestureEstimator>(),
           std::make_shared<PaGestureEstimator>(),
+          std::make_shared<HeartGestureEstimator>(),
       };
 
   // std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
@@ -313,6 +282,18 @@ absl::Status RunMPPGraph(
     // cv::Mat landmark_image = cv::Mat::zeros(camera_frame_raw.size(),
     // CV_8UC3);
     cv::Mat landmark_image = camera_frame_raw;
+
+#if 0
+    // Blur to proctect privacy. ---
+    for (int i = 0; i < 5; i++)
+      cv::resize(landmark_image, landmark_image,
+                 cv::Size(landmark_image.cols / 2, landmark_image.rows / 2));
+
+    cv::resize(landmark_image, landmark_image,
+               cv::Size(camera_frame_raw.cols, camera_frame_raw.rows));
+    // --- Blur to proctect privacy.
+#endif
+
     // --- Extract landmarks when callback.
 
     // PostProcess ---
@@ -330,7 +311,7 @@ absl::Status RunMPPGraph(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
     // TODO: refactor
-    std::vector<int> new_status_list((int)(JankenGestureType::NUM_GESTURES));
+    std::vector<bool> new_status_list((int)(JankenGestureType::NUM_GESTURES));
 
     auto current_recognized_type = JankenGestureType::UNKNOWN;
     if (landmarks_list.size() == 0) {
@@ -342,7 +323,7 @@ absl::Status RunMPPGraph(
       // else if (landmarks_list.size() == 1) {
       // 片手 -> 両手でもおｋにした。
       cv::Mat gesture_image;
-      for (auto &estimator : one_hand_estimator_list) {
+      for (auto &estimator : hand_estimator_list) {
         // std::cout << landmarks_list[0].landmark_size() << std::endl;
         estimator->Initialize();
         const JankenGestureType recognized_type =
@@ -418,9 +399,12 @@ absl::Status RunMPPGraph(
               (camera_frame_raw.rows - overlap_image.cols) / 2, 0,
               overlap_image.cols, overlap_image.rows);
     }
+    cv::putText(output_frame_display_right, std::string("Finish: <ESC>"),
+                cv::Point(camera_frame_raw.rows - 140, camera_frame_raw.rows - 10),
+                1, 1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
     // Update all status-buffer.
-    new_status_list[(int)(current_recognized_type)]++;
+    new_status_list[(int)(current_recognized_type)] = true;
     // for (auto &new_status : new_status_list)
     //   std::cout << new_status << " ";
     // std::cout << std::endl;
@@ -430,8 +414,8 @@ absl::Status RunMPPGraph(
 
     if (time_since_resetting < 10) {
       // 合否表示注はバッファをクリアしておく。
-      status_buffer_list = std::vector<std::deque<int>>();
-      InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
+      status_buffer_list = std::vector<StatusBuffer>();
+      StatusBufferProcessor::InitializeGestureStatusBufferList(kBufferSize, &status_buffer_list);
 
       cv::circle(
           output_frame_display_left,
@@ -440,10 +424,10 @@ absl::Status RunMPPGraph(
       time_since_resetting++;
     } else {
       // 合否結果を表示しているときは更新しない。
-      UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
+      StatusBufferProcessor::UpdateGestureStatusBufferList(new_status_list, &status_buffer_list);
 
       std::vector<float> result_list;
-      CalculateStatistics(status_buffer_list, &result_list);
+      StatusBufferProcessor::CalculateStatistics(status_buffer_list, &result_list);
       JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
       float max_score = 0;
       for (int i = 0; i < result_list.size(); i++) {
@@ -492,119 +476,119 @@ absl::Status RunMPPGraph(
           }
         }
 
-      // ResultType next_result_type = current_result_type;
-      // while (candidate_of_gesture_type == opposite_gesture &&
-      //        current_result_type == next_result_type) {
-      //   opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
-      //   next_result_type = JankenJudgement::JudgeNormalJanken(
-      //       candidate_of_gesture_type, opposite_gesture);
-      // }
+        // ResultType next_result_type = current_result_type;
+        // while (candidate_of_gesture_type == opposite_gesture &&
+        //        current_result_type == next_result_type) {
+        //   opposite_gesture = JankenGestureType(opposite_gesture_rand_n(mt));
+        //   next_result_type = JankenJudgement::JudgeNormalJanken(
+        //       candidate_of_gesture_type, opposite_gesture);
+        // }
 
-      time_since_resetting = 0;
+        time_since_resetting = 0;
+      } else {
+        // CreateWhiteImage(cv::Size(camera_frame_raw.rows,
+        // camera_frame_raw.rows),
+        //                  &output_frame_display_left);
+        output_frame_display_left = kGestureImageMap[opposite_gesture];
+        cv::resize(output_frame_display_left, output_frame_display_left,
+                   cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
+        auto &ope_image = kOperationImageMap[operation];
+
+        // 全体の横幅がカメラフレームの縦幅と同じなので注意。
+        Overlap(output_frame_display_left, ope_image,
+                (camera_frame_raw.rows - ope_image.cols) / 2, 0, ope_image.cols,
+                ope_image.rows);
+      }
+      landmarks_list =
+          std::vector<mediapipe::NormalizedLandmarkList>();  // reset
     }
-    else {
-      // CreateWhiteImage(cv::Size(camera_frame_raw.rows,
-      // camera_frame_raw.rows),
-      //                  &output_frame_display_left);
-      output_frame_display_left = kGestureImageMap[opposite_gesture];
-      cv::resize(output_frame_display_left, output_frame_display_left,
-                 cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-      auto &ope_image = kOperationImageMap[operation];
 
-      // 全体の横幅がカメラフレームの縦幅と同じなので注意。
-      Overlap(output_frame_display_left, ope_image,
-              (camera_frame_raw.rows - ope_image.cols) / 2, 0, ope_image.cols,
-              ope_image.rows);
-    }
-    landmarks_list = std::vector<mediapipe::NormalizedLandmarkList>();  // reset
-  }
+    // delay
+    // std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-  // delay
-  // std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    const auto current_time = std::chrono::system_clock::now();
+    const double time_sec =
+        (double)(std::chrono::duration_cast<std::chrono::microseconds>(
+                     current_time - start_time)
+                     .count() /
+                 1000.0) /
+        1000.0;
+    const double time_left_sec = kLimitTimeSec - std::round(time_sec * 10) / 10;
+    // std::cout << time_sec << std::endl;
+    // std::cout << kLimitTimeSec << std::endl;
+    std::stringstream ss;
+    ss << std::setprecision(4) << time_left_sec;
 
-  const auto current_time = std::chrono::system_clock::now();
-  const double time_sec =
-      (double)(std::chrono::duration_cast<std::chrono::microseconds>(
-                   current_time - start_time)
-                   .count() /
-               1000.0) /
-      1000.0;
-  const double time_left_sec = kLimitTimeSec - std::round(time_sec * 10) / 10;
-  // std::cout << time_sec << std::endl;
-  // std::cout << kLimitTimeSec << std::endl;
-  std::stringstream ss;
-  ss << std::setprecision(4) << time_left_sec;
-
-  cv::putText(
-      output_frame_display_left, std::string("Limit: ") + ss.str(),
-      cv::Point(camera_frame_raw.rows - 170, camera_frame_raw.rows - 20), 2,
-      0.8, cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-
-  // display score
-  cv::putText(output_frame_display_left,
-              std::string("Score: ") + std::to_string(win_cnt),
-              cv::Point(20, camera_frame_raw.rows - 20), 2, 0.8,
-              cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-
-  // cv::circle(*output_frame_display_right, cv::Point(x, y), 2, cv::Scalar(0,
-  // 0, 255), 4,
-  //            cv::LINE_4);
-  // --- 左の表示
-
-  cv::Mat output_frame_display;
-  cv::hconcat(output_frame_display_left, output_frame_display_right,
-              output_frame_display);
-  // --- PostProcess
-
-  // cv::cvtColor(output_frame_display_right, output_frame_display_right,
-  // cv::COLOR_RGB2BGR);
-  cv::imshow(kWindowName, output_frame_display);
-  // Press any key to exit.
-
-  if (time_left_sec <= 0) {
-    const cv::Mat result_image =
-        cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
     cv::putText(
-        result_image, std::string("Your Score: ") + std::to_string(win_cnt),
-        // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
-        cv::Point(30, camera_frame_raw.rows / 2 - 35), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-    cv::putText(
-        result_image, std::string("Restart: <Space>"),
-        // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
-        cv::Point(30, camera_frame_raw.rows / 2 + 20), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
-    cv::putText(
-        result_image, std::string("Finish: <ESC>"),
-        // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
-        cv::Point(30, camera_frame_raw.rows / 2 + 75), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+        output_frame_display_left, std::string("Limit: ") + ss.str(),
+        cv::Point(camera_frame_raw.rows - 170, camera_frame_raw.rows - 20), 2,
+        0.8, cv::Scalar(0, 255, 255), 2, cv::LINE_4);
 
-    const cv::Mat instruction_image =
-        cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
-    cv::hconcat(result_image, instruction_image, output_frame_display);
+    // display score
+    cv::putText(output_frame_display_left,
+                std::string("Score: ") + std::to_string(win_cnt),
+                cv::Point(20, camera_frame_raw.rows - 20), 2, 0.8,
+                cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+
+    // cv::circle(*output_frame_display_right, cv::Point(x, y), 2, cv::Scalar(0,
+    // 0, 255), 4,
+    //            cv::LINE_4);
+    // --- 左の表示
+
+    cv::Mat output_frame_display;
+    cv::hconcat(output_frame_display_left, output_frame_display_right,
+                output_frame_display);
+    // --- PostProcess
+
+    // cv::cvtColor(output_frame_display_right, output_frame_display_right,
+    // cv::COLOR_RGB2BGR);
     cv::imshow(kWindowName, output_frame_display);
-    const int pressed_key = cv::waitKey(0);
-    if (pressed_key == kCvWaitkeyEsc) {
-      // terminate
-      grab_frames = false;
-    } else if (pressed_key == kCvWaitkeySpase) {
-      // restart
-      start_time = std::chrono::system_clock::now();
-      win_cnt = 0;
-      continue;
-    }
-  } else {
-    const int pressed_key = cv::waitKey(1);
-    if (pressed_key == kCvWaitkeyEsc) {
-      // terminate
-      grab_frames = false;
+    // Press any key to exit.
+
+    if (time_left_sec <= 0) {
+      const cv::Mat result_image =
+          cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
+      cv::putText(
+          result_image, std::string("Your Score: ") + std::to_string(win_cnt),
+          // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
+          cv::Point(30, camera_frame_raw.rows / 2 - 35), 2, 1.5,
+          cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+      cv::putText(
+          result_image, std::string("Restart: <Space>"),
+          // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
+          cv::Point(30, camera_frame_raw.rows / 2 + 20), 2, 1.5,
+          cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+      cv::putText(
+          result_image, std::string("Finish: <ESC>"),
+          // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
+          cv::Point(30, camera_frame_raw.rows / 2 + 75), 2, 1.5,
+          cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+
+      const cv::Mat instruction_image =
+          cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
+      cv::hconcat(result_image, instruction_image, output_frame_display);
+      cv::imshow(kWindowName, output_frame_display);
+      const int pressed_key = cv::waitKey(0);
+      if (pressed_key == kCvWaitkeyEsc) {
+        // terminate
+        grab_frames = false;
+      } else if (pressed_key == kCvWaitkeySpase) {
+        // restart
+        start_time = std::chrono::system_clock::now();
+        win_cnt = 0;
+        continue;
+      }
+    } else {
+      const int pressed_key = cv::waitKey(1);
+      if (pressed_key == kCvWaitkeyEsc) {
+        // terminate
+        grab_frames = false;
+      }
     }
   }
-}
 
-MP_RETURN_IF_ERROR(graph.CloseInputStream(kInputStream));
-return graph.WaitUntilDone();
+  MP_RETURN_IF_ERROR(graph.CloseInputStream(kInputStream));
+  return graph.WaitUntilDone();
 }
 
 int main(int argc, char **argv) {
@@ -618,9 +602,8 @@ int main(int argc, char **argv) {
   std::vector<std::vector<cv::Point2i>> *left_eye_landmarks_list;
   std::vector<std::vector<cv::Point2i>> *right_eye_landmarks_list;
 
-  absl::Status run_status =
-      RunMPPGraph(calculator_graph_config_file, left_eye_landmarks_list,
-                  right_eye_landmarks_list);
+  absl::Status run_status = RunMPPGraph(calculator_graph_config_file);
+
   if (!run_status.ok()) {
     LOG(ERROR) << "Failed to run the graph: " << run_status.message();
     return EXIT_FAILURE;

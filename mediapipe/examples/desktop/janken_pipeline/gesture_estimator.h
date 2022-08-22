@@ -23,7 +23,8 @@ enum class JankenGestureType {
     GU = 1,
     CHOKI = 2,
     PA = 3,
-    NUM_GESTURES = 4,
+    HEART = 4,  // HEART はじゃんけんでないのでなんとかしたい。
+    NUM_GESTURES,
 };
 
 class AbstractHandGestureEstimator {
@@ -98,13 +99,13 @@ class TwoHandsGestureEstimator : public AbstractHandGestureEstimator {
                   &hand_landmarks_list){return JankenGestureType::UNKNOWN;};
 };
 
-// class HeartGestureEstimator : public TwoHandsGestureEstimator {
-//   public:
-//     // TwoHandsGestureEstimator(){};
-//     // virtual ~TwoHandsGestureEstimator(){};
-//     virtual void Initialize(){};
-//     virtual const JankenGestureType
-//     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
-//                   &hand_landmarks_list);
-// };
+class HeartGestureEstimator : public TwoHandsGestureEstimator {
+  public:
+    // TwoHandsGestureEstimator(){};
+    // virtual ~TwoHandsGestureEstimator(){};
+    virtual void Initialize(){};
+    virtual const JankenGestureType
+    Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
+                  &hand_landmarks_list);
+};
 // --- Two Hands

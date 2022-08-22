@@ -32,6 +32,7 @@ cc_binary(
 
         "//mediapipe/examples/desktop/janken_pipeline:gesture_estimator",
         "//mediapipe/examples/desktop/janken_pipeline:janken_judgement",
+        "//mediapipe/examples/desktop/janken_pipeline:status_buffer_processor",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:image_frame_opencv",
@@ -62,6 +63,18 @@ cc_library(
     name = "janken_judgement",
     srcs = ["janken_judgement.cc"],
     hdrs = ["janken_judgement.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//mediapipe/calculators/util:detections_to_rects_calculator",
+        "//mediapipe/calculators/util:detections_to_rects_calculator_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "status_buffer_processor",
+    srcs = ["status_buffer_processor.cc"],
+    hdrs = ["status_buffer_processor.h"],
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/calculators/util:detections_to_rects_calculator",

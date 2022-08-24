@@ -8,14 +8,13 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 
+// TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 20.0;
-
   k_window_name_ = "Janken++ (beta version)";
-  k_limit_time_sec_ = 20.0;
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
-  k_buffer_size_ = 23;
+  k_buffer_size_ = 17;
 
   k_description_image_ = cv::imread("mediapipe/resources/description.png");
   k_your_hand_image_ = cv::imread("mediapipe/resources/your_hand.png");
@@ -27,7 +26,7 @@ PostProcessor::PostProcessor() {
       std::make_shared<HeartGestureEstimator>(),
   };
 
-  std::map<JankenGestureType, cv::Mat> k_gesture_image_map_;
+  k_gesture_image_map_;
   k_gesture_image_map_[JankenGestureType::GU] =
       cv::imread("mediapipe/resources/gu.png");
   k_gesture_image_map_[JankenGestureType::CHOKI] =
@@ -44,18 +43,23 @@ PostProcessor::PostProcessor() {
   k_operation_image_map_[ResultType::DRAW] =
       cv::imread("mediapipe/resources/draw_operation.png");
 
-  k_th_score_ = 0.5;
+  k_th_score_ = 0.75;
 
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
-  k_operation_rand_n_ = std::uniform_int_distribution<>(
-      1, (int)(ResultType::NUM_RESULT_TYPES)-1);  // [1, n] 範囲の一様乱数,
+  k_operation_rand_n_ =
+      std::uniform_int_distribution<>(1, (int)(ResultType::NUM_RESULT_TYPES)-1);
+  // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   k_opposite_gesture_rand_n_ = std::uniform_int_distribution<>(
       1,
       (int)(JankenGestureType::NUM_GESTURES)-2);  // [1, n-1]
                                                   // 範囲の一様乱数,
+                                                  // UNKNOWMN, HEART はスキップ
+  operation_ = ResultType(k_operation_rand_n_(k_mt_));
+  opposite_gesture_ = JankenGestureType(k_opposite_gesture_rand_n_(k_mt_));
 }
 
+// TODO: refactor a code below
 void PostProcessor::Execute(
     const cv::Mat &camera_frame_raw,
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
@@ -103,6 +107,7 @@ void PostProcessor::Execute(
       gesture_image = cv::Mat::zeros(
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
     } else {
+      // std::cout << "resize1" << std::endl;
       cv::resize(gesture_image, gesture_image,
                  cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
     }
@@ -128,6 +133,7 @@ void PostProcessor::Execute(
   // Write text.
   if (current_recognized_type != JankenGestureType::UNKNOWN) {
     cv::Mat gesture_image = k_gesture_image_map_[current_recognized_type];
+    // std::cout << "resize2" << std::endl;
     cv::resize(gesture_image, gesture_image,
                cv::Size(k_your_hand_image_.rows, k_your_hand_image_.rows));
 
@@ -140,7 +146,7 @@ void PostProcessor::Execute(
                         overlap_image.cols, overlap_image.rows);
   }
   cv::putText(
-      output_frame_display_right, std::string("Finish: <ESC>"),
+      output_frame_display_right, std::string("Quit: <ESC>"),
       cv::Point(camera_frame_raw.rows - 140, camera_frame_raw.rows - 10), 1,
       1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
@@ -181,13 +187,6 @@ void PostProcessor::Execute(
     const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
         candidate_of_gesture_type, opposite_gesture_);
 
-    // std::cout << "Current result, Your gesture, Opposite gesture,
-    // Operation: "
-    //           << (int)(current_result_type) << ", "
-    //           << (int)(candidate_of_gesture_type) << ", "
-    //           << (int)(opposite_gesture) << ", " << (int)(operation)
-    //           << std::endl;
-
     // スコアを更新するタイミングでは次のお題を表示しない。
     const bool flag_for_update = (current_result_type == operation_);
     if (flag_for_update && k_th_score_ < max_score) {
@@ -220,6 +219,8 @@ void PostProcessor::Execute(
       // camera_frame_raw.rows),
       //                  &output_frame_display_left);
       output_frame_display_left = k_gesture_image_map_[opposite_gesture_];
+      // std::cout << output_frame_display_left.empty() << std::endl;
+      // std::cout << "resize3" << std::endl;
       cv::resize(output_frame_display_left, output_frame_display_left,
                  cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
       auto &ope_image = k_operation_image_map_[operation_];
@@ -289,7 +290,7 @@ void PostProcessor::Execute(
         cv::Point(30, camera_frame_raw.rows / 2 + 20), 2, 1.5,
         cv::Scalar(0, 255, 0), 2, cv::LINE_4);
     cv::putText(
-        result_image, std::string("Finish: <ESC>"),
+        result_image, std::string("Quit: <ESC>"),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
         cv::Point(30, camera_frame_raw.rows / 2 + 75), 2, 1.5,
         cv::Scalar(0, 255, 0), 2, cv::LINE_4);
@@ -306,7 +307,8 @@ void PostProcessor::Execute(
       // restart
       *start_time = std::chrono::system_clock::now();
       win_cnt_ = 0;
-      // continue;
+      status_buffer_list_ = std::vector<StatusBuffer>();
+      StatusBufferProcessor::Initialize(k_buffer_size_, &status_buffer_list_);
     }
   } else {
     const int pressed_key = cv::waitKey(1);

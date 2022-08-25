@@ -9,21 +9,13 @@ enum HandType {
     RIGHT_HAND = 1,
 };
 
-// enum class GestureType {
-//     UNKNOWN = 0,
-//     GU = 1,
-//     CHOKI = 2,
-//     PA = 3,
-//     HEART = 4,
-//     NUM_GESTURES = 5,
-// };
-
-enum class JankenGestureType {
-    UNKNOWN = 0,
-    GU = 1,
-    CHOKI = 2,
-    PA = 3,
-    HEART = 4,  // HEART はじゃんけんでないのでなんとかしたい。
+enum class GestureType {
+    UNKNOWN,
+    GU,
+    CHOKI,
+    PA,
+    HEART,  // HEART はじゃんけんでないのでなんとかしたい。
+    THE_103,  // THE_103 はじゃんけんでないのでなんとかしたい。
     NUM_GESTURES,
 };
 
@@ -32,7 +24,7 @@ class AbstractHandGestureEstimator {
     // AbstractHandGestureEstimator();
     virtual ~AbstractHandGestureEstimator(){};
     virtual void Initialize() = 0;
-    virtual const JankenGestureType
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list) = 0;
 };
@@ -43,11 +35,11 @@ class OneHandGestureEstimator : public AbstractHandGestureEstimator {
     // OneHandGestureEstimator();
     virtual void Initialize();
 
-    virtual const JankenGestureType
+    virtual const GestureType
     // Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
     //               &hand_landmarks_list);
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
-                  &hand_landmarks_list){return JankenGestureType::UNKNOWN;};
+                  &hand_landmarks_list){return GestureType::UNKNOWN;};
   protected:
     // TODO: implement
     void SetHandType(const HandType &hand_type);
@@ -64,7 +56,7 @@ class GuGestureEstimator : public OneHandGestureEstimator {
   public:
     // GuGestureEstimator(){};
     virtual void Initialize(){};
-    virtual const JankenGestureType
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };
@@ -73,7 +65,7 @@ class ChokiGestureEstimator : public OneHandGestureEstimator {
   public:
     // ChokiGestureEstimator(){};
     virtual void Initialize(){};
-    virtual const JankenGestureType
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };
@@ -82,7 +74,7 @@ class PaGestureEstimator : public OneHandGestureEstimator {
   public:
     // PaGestureEstimator(){};
     virtual void Initialize(){};
-    virtual const JankenGestureType
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };
@@ -94,9 +86,9 @@ class TwoHandsGestureEstimator : public AbstractHandGestureEstimator {
     // TwoHandsGestureEstimator(){};
     // virtual ~TwoHandsGestureEstimator(){};
     virtual void Initialize(){};
-    virtual const JankenGestureType
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
-                  &hand_landmarks_list){return JankenGestureType::UNKNOWN;};
+                  &hand_landmarks_list){return GestureType::UNKNOWN;};
 };
 
 class HeartGestureEstimator : public TwoHandsGestureEstimator {
@@ -104,7 +96,17 @@ class HeartGestureEstimator : public TwoHandsGestureEstimator {
     // TwoHandsGestureEstimator(){};
     // virtual ~TwoHandsGestureEstimator(){};
     virtual void Initialize(){};
-    virtual const JankenGestureType
+    virtual const GestureType
+    Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
+                  &hand_landmarks_list);
+};
+
+class The103GestureEstimator : public TwoHandsGestureEstimator {
+  public:
+    // TwoHandsGestureEstimator(){};
+    // virtual ~TwoHandsGestureEstimator(){};
+    virtual void Initialize(){};
+    virtual const GestureType
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };

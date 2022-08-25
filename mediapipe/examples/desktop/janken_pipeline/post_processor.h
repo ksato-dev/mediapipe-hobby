@@ -40,7 +40,7 @@ class PostProcessor {
   std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
       k_hand_estimator_list_;
 
-  std::map<JankenGestureType, cv::Mat> k_gesture_image_map_;
+  std::map<GestureType, cv::Mat> k_gesture_image_map_;
   std::map<ResultType, cv::Mat> k_operation_image_map_;
 
   double k_th_score_;
@@ -50,7 +50,7 @@ class PostProcessor {
   std::uniform_int_distribution<> k_opposite_gesture_rand_n_;
 
   ResultType operation_;
-  JankenGestureType opposite_gesture_;
+  GestureType opposite_gesture_;
 
   std::vector<StatusBuffer> status_buffer_list_;
   int time_since_resetting_;  // 初期値がゼロだとはじめに〇が出てしまう。

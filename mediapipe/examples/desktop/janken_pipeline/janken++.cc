@@ -59,7 +59,7 @@ const int kCvWaitkeySpase = 32;
 const double kLimitTimeSec = 20.0;
 const int kBufferSize = 23;
 
-std::map<JankenGestureType, cv::Mat> kGestureImageMap;
+std::map<GestureType, cv::Mat> kGestureImageMap;
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -77,13 +77,13 @@ absl::Status Configure(const std::string &calculator_graph_config_file,
 }
 
 absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
-  kGestureImageMap[JankenGestureType::GU] =
+  kGestureImageMap[GestureType::GU] =
       cv::imread("mediapipe/resources/gu.png");
-  kGestureImageMap[JankenGestureType::CHOKI] =
+  kGestureImageMap[GestureType::CHOKI] =
       cv::imread("mediapipe/resources/choki.png");
-  kGestureImageMap[JankenGestureType::PA] =
+  kGestureImageMap[GestureType::PA] =
       cv::imread("mediapipe/resources/pa.png");
-  kGestureImageMap[JankenGestureType::HEART] =
+  kGestureImageMap[GestureType::HEART] =
       cv::imread("mediapipe/resources/heart.png");
 
   int win_cnt = 0;
@@ -113,7 +113,7 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   // //     1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   // std::uniform_int_distribution<> opposite_gesture_rand_n(
   //     1,
-  //     (int)(JankenGestureType::NUM_GESTURES)-2);  // [1, n-1] 範囲の一様乱数,
+  //     (int)(GestureType::NUM_GESTURES)-2);  // [1, n-1] 範囲の一様乱数,
   //                                                 // UNKNOWMN, HEART はスキップ
 
   // std::cout << "called RunMPPGraph" << std::endl;
@@ -129,6 +129,7 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
           std::make_shared<ChokiGestureEstimator>(),
           std::make_shared<PaGestureEstimator>(),
           std::make_shared<HeartGestureEstimator>(),
+          std::make_shared<The103GestureEstimator>(),
       };
 
   // std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
@@ -162,8 +163,8 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   bool grab_frames = true;
 
   // ResultType operation = ResultType(operation_rand_n(mt));
-  // JankenGestureType opposite_gesture =
-  //     JankenGestureType(opposite_gesture_rand_n(mt));
+  // GestureType opposite_gesture =
+  //     GestureType(opposite_gesture_rand_n(mt));
 
   int num_frames_since_resetting = 1000;  // 初期値がゼロだとはじめに〇が出てしまう。
   auto start_time = std::chrono::system_clock::now();

@@ -24,17 +24,20 @@ PostProcessor::PostProcessor() {
       std::make_shared<ChokiGestureEstimator>(),
       std::make_shared<PaGestureEstimator>(),
       std::make_shared<HeartGestureEstimator>(),
+      std::make_shared<The103GestureEstimator>(),
   };
 
   k_gesture_image_map_;
-  k_gesture_image_map_[JankenGestureType::GU] =
+  k_gesture_image_map_[GestureType::GU] =
       cv::imread("mediapipe/resources/gu.png");
-  k_gesture_image_map_[JankenGestureType::CHOKI] =
+  k_gesture_image_map_[GestureType::CHOKI] =
       cv::imread("mediapipe/resources/choki.png");
-  k_gesture_image_map_[JankenGestureType::PA] =
+  k_gesture_image_map_[GestureType::PA] =
       cv::imread("mediapipe/resources/pa.png");
-  k_gesture_image_map_[JankenGestureType::HEART] =
+  k_gesture_image_map_[GestureType::HEART] =
       cv::imread("mediapipe/resources/heart.png");
+  k_gesture_image_map_[GestureType::THE_103] =
+      cv::imread("mediapipe/resources/103.png");
 
   k_operation_image_map_[ResultType::WIN] =
       cv::imread("mediapipe/resources/win_operation.png");
@@ -48,15 +51,15 @@ PostProcessor::PostProcessor() {
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
   k_operation_rand_n_ =
-      std::uniform_int_distribution<>(1, (int)(ResultType::NUM_RESULT_TYPES)-1);
+      std::uniform_int_distribution<>(1, (int)(ResultType::NUM_RESULT_TYPES)-2);
   // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   k_opposite_gesture_rand_n_ = std::uniform_int_distribution<>(
       1,
-      (int)(JankenGestureType::NUM_GESTURES)-2);  // [1, n-1]
+      (int)(GestureType::NUM_GESTURES)-3);  // [1, n-1]
                                                   // 範囲の一様乱数,
                                                   // UNKNOWMN, HEART はスキップ
   operation_ = ResultType(k_operation_rand_n_(k_mt_));
-  opposite_gesture_ = JankenGestureType(k_opposite_gesture_rand_n_(k_mt_));
+  opposite_gesture_ = GestureType(k_opposite_gesture_rand_n_(k_mt_));
 }
 
 // TODO: refactor a code below
@@ -65,8 +68,12 @@ void PostProcessor::Execute(
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
     cv::Mat *output_frame_for_display,
     std::chrono::system_clock::time_point *start_time, bool *grab_frames) {
-  cv::Mat landmark_image;
-  VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
+#if 1
+  cv::Mat landmark_image = camera_frame_raw;
+#else
+  // cv::Mat landmark_image;
+  // VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
+#endif
 
   for (int i = 0; i < landmarks_list->size(); i++) {
     mediapipe::NormalizedLandmarkList &landmarks = landmarks_list->at(i);
@@ -81,9 +88,9 @@ void PostProcessor::Execute(
   output_frame_display_right = cv::Mat::zeros(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-  std::vector<bool> new_status_list((int)(JankenGestureType::NUM_GESTURES));
+  std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES));
 
-  auto current_recognized_type = JankenGestureType::UNKNOWN;
+  auto current_recognized_type = GestureType::UNKNOWN;
   if (landmarks_list->size() == 0) {
     VisUtility::Overlap(output_frame_display_right, k_description_image_,
                         (camera_frame_raw.rows - k_description_image_.cols) / 2,
@@ -96,9 +103,9 @@ void PostProcessor::Execute(
     for (auto &estimator : k_hand_estimator_list_) {
       // std::cout << landmarks_list[0].landmark_size() << std::endl;
       estimator->Initialize();
-      const JankenGestureType temp_recognized_type =
+      const GestureType temp_recognized_type =
           estimator->Recognize(*landmarks_list);
-      if (temp_recognized_type != JankenGestureType::UNKNOWN) {
+      if (temp_recognized_type != GestureType::UNKNOWN) {
         gesture_image = k_gesture_image_map_[temp_recognized_type];
         current_recognized_type = temp_recognized_type;
       }
@@ -131,11 +138,18 @@ void PostProcessor::Execute(
   }
 
   // Write text.
-  if (current_recognized_type != JankenGestureType::UNKNOWN) {
+  if (current_recognized_type != GestureType::UNKNOWN) {
     cv::Mat gesture_image = k_gesture_image_map_[current_recognized_type];
     // std::cout << "resize2" << std::endl;
+    const float resize_ratio =
+        ((float)k_your_hand_image_.rows / gesture_image.rows);
+    const int resized_gesture_image_width =
+        std::roundl(gesture_image.cols * resize_ratio);
+    const int resized_gesture_image_height =
+        std::roundl(gesture_image.rows * resize_ratio);
     cv::resize(gesture_image, gesture_image,
-               cv::Size(k_your_hand_image_.rows, k_your_hand_image_.rows));
+               cv::Size(resized_gesture_image_width,
+                        resized_gesture_image_height));
 
     cv::Mat overlap_image;
     cv::hconcat(k_your_hand_image_, gesture_image, overlap_image);
@@ -172,11 +186,11 @@ void PostProcessor::Execute(
     std::vector<float> score_list;
     StatusBufferProcessor::CalculateStatistics(status_buffer_list_,
                                                &score_list);
-    JankenGestureType candidate_of_gesture_type = JankenGestureType::UNKNOWN;
+    GestureType candidate_of_gesture_type = GestureType::UNKNOWN;
     float max_score = 0;
     for (int i = 0; i < score_list.size(); i++) {
       if (max_score < score_list[i]) {
-        candidate_of_gesture_type = JankenGestureType(i);
+        candidate_of_gesture_type = GestureType(i);
         max_score = score_list[i];
       }
     }
@@ -193,12 +207,12 @@ void PostProcessor::Execute(
       win_cnt_++;
 
       // 相手の次の手は今のと重複しないようにする。
-      // JankenGestureType pre_oppo_gesture = candidate_of_gesture_type;
+      // GestureType pre_oppo_gesture = candidate_of_gesture_type;
 
-      JankenGestureType next_correct_gesture_type = candidate_of_gesture_type;
+      GestureType next_correct_gesture_type = candidate_of_gesture_type;
       while (candidate_of_gesture_type == next_correct_gesture_type) {
-        JankenGestureType next_opposite_gesture =
-            JankenGestureType(k_opposite_gesture_rand_n_(k_mt_));
+        GestureType next_opposite_gesture =
+            GestureType(k_opposite_gesture_rand_n_(k_mt_));
         ResultType next_operation = ResultType(k_operation_rand_n_(k_mt_));
         ResultType next_result_type = JankenJudgement::JudgeNormalJanken(
             candidate_of_gesture_type, next_opposite_gesture);

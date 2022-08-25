@@ -3,7 +3,7 @@
 
 void StatusBufferProcessor::Initialize(
     const int &buffer_size, std::vector<StatusBuffer> *status_buffer_list) {
-  for (int i = 0; i < (int)(JankenGestureType::NUM_GESTURES); i++)
+  for (int i = 0; i < (int)(GestureType::NUM_GESTURES); i++)
     status_buffer_list->push_back(StatusBuffer(buffer_size, 0));
 }
 

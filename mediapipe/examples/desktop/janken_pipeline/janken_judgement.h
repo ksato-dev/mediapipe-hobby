@@ -1,0 +1,24 @@
+#pragma once
+
+#include <string>
+
+#include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
+
+// cite: https://github.com/ksato-dev/JankenExercise
+// TODO: Convert enum to vector<pair<ResultType, RuleType>>
+enum ResultType {
+  UNKNOWN,
+  WIN,
+  LOSE,
+  DRAW,
+  IMITAION,
+  NUM_RESULT_TYPES,
+};
+
+class JankenJudgement {
+ public:
+  // const bool Judge(const GestureType &gesture_type);
+  static const ResultType JudgeNormalJanken(
+      const GestureType &your_gesture,
+      const GestureType &opposite_gesture);
+};

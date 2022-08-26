@@ -52,14 +52,11 @@
 constexpr char kInputStream[] = "input_video";
 // constexpr char kOutputStream[] = "output_video";
 constexpr char kOutputStream[] = "landmarks";
-constexpr char kWindowName[] = "Janken++ (beta version)";
 
 const int kCvWaitkeyEsc = 27;
 const int kCvWaitkeySpase = 32;
 const double kLimitTimeSec = 20.0;
 const int kBufferSize = 23;
-
-std::map<GestureType, cv::Mat> kGestureImageMap;
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -77,44 +74,9 @@ absl::Status Configure(const std::string &calculator_graph_config_file,
 }
 
 absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
-  kGestureImageMap[GestureType::GU] =
-      cv::imread("mediapipe/resources/gu.png");
-  kGestureImageMap[GestureType::CHOKI] =
-      cv::imread("mediapipe/resources/choki.png");
-  kGestureImageMap[GestureType::PA] =
-      cv::imread("mediapipe/resources/pa.png");
-  kGestureImageMap[GestureType::HEART] =
-      cv::imread("mediapipe/resources/heart.png");
-
   int win_cnt = 0;
   std::vector<StatusBuffer> status_buffer_list;
   StatusBufferProcessor::Initialize(kBufferSize, &status_buffer_list);
-
-//   std::map<ResultType, cv::Mat> kOperationImageMap;
-//   kOperationImageMap[ResultType::WIN] =
-//       cv::imread("mediapipe/resources/win_operation.png");
-//   kOperationImageMap[ResultType::LOSE] =
-//       cv::imread("mediapipe/resources/loss_operation.png");
-//   kOperationImageMap[ResultType::DRAW] =
-//       cv::imread("mediapipe/resources/draw_operation.png");
-
-//   const cv::Mat description_image =
-//       cv::imread("mediapipe/resources/description.png");
-//   const cv::Mat your_hand_image =
-//       cv::imread("mediapipe/resources/your_hand.png");
-
-  // std::random_device rnd;  // 非決定的な乱数生成器
-  // std::mt19937_64 mt(
-  //     rnd());  // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
-  // std::uniform_int_distribution<> operation_rand_n(
-  //     1, (int)(ResultType::NUM_RESULT_TYPES)-1);  // [1, n] 範囲の一様乱数,
-  //                                                 // UNKNOWN はスキップ
-  // // std::uniform_int_distribution<> operation_rand_n(
-  // //     1, 1); // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
-  // std::uniform_int_distribution<> opposite_gesture_rand_n(
-  //     1,
-  //     (int)(GestureType::NUM_GESTURES)-2);  // [1, n-1] 範囲の一様乱数,
-  //                                                 // UNKNOWMN, HEART はスキップ
 
   // std::cout << "called RunMPPGraph" << std::endl;
   mediapipe::CalculatorGraphConfig config;
@@ -123,15 +85,6 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   std::vector<mediapipe::NormalizedLandmarkList> landmarks_list;
 
   // TODO: Move to global field
-  std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
-      hand_estimator_list = {
-          std::make_shared<GuGestureEstimator>(),
-          std::make_shared<ChokiGestureEstimator>(),
-          std::make_shared<PaGestureEstimator>(),
-          std::make_shared<HeartGestureEstimator>(),
-          std::make_shared<The103GestureEstimator>(),
-      };
-
   // std::vector<std::shared_ptr<AbstractHandGestureEstimator>>
   // two_hands_estimator_list = {
   //   std::make_shared<HeartGestureEstimator>()

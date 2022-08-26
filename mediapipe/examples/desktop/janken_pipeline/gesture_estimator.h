@@ -15,17 +15,18 @@ enum class RuleType {
   UNKNOWN,
   JANKEN,
   IMITATION,
-  NUM_RULES,
+  NUM_RULES
 };
 
 enum class GestureType {
     UNKNOWN,
-    GU,
-    CHOKI,
-    PA,
-    HEART,  // HEART はじゃんけんでないのでなんとかしたい。
-    THE_103,  // THE_103 はじゃんけんでないのでなんとかしたい。
-    NUM_GESTURES,
+    GU,  // JANKEN
+    CHOKI,  // JANKEN
+    PA,  // JANKEN
+    HEART,
+    THE_103,
+    RYOIKI_TENKAI,
+    NUM_GESTURES
 };
 
 class AbstractHandGestureEstimator {
@@ -87,6 +88,15 @@ class PaGestureEstimator : public OneHandGestureEstimator {
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };
+
+class RyoikiTenkaiGestureEstimator : public OneHandGestureEstimator {
+  public:
+    // PaGestureEstimator(){};
+    virtual void Initialize(){};
+    virtual const GestureType
+    Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
+                  &hand_landmarks_list);
+};
 // --- One Hand
 
 // Two Hands ---
@@ -119,4 +129,5 @@ class The103GestureEstimator : public TwoHandsGestureEstimator {
     Recognize(const std::vector<mediapipe::NormalizedLandmarkList>
                   &hand_landmarks_list);
 };
+
 // --- Two Hands

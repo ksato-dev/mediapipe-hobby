@@ -12,7 +12,7 @@
 // TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 20.0;
-  k_window_name_ = "Janken++ (beta version)";
+  k_window_name_ = "Gesture++ (beta version)";
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
   k_buffer_size_ = 17;
@@ -26,6 +26,7 @@ PostProcessor::PostProcessor() {
       std::make_shared<PaGestureEstimator>(),
       std::make_shared<HeartGestureEstimator>(),
       std::make_shared<The103GestureEstimator>(),
+      std::make_shared<RyoikiTenkaiGestureEstimator>(),
   };
 
   k_gesture_image_map_;
@@ -39,6 +40,8 @@ PostProcessor::PostProcessor() {
       cv::imread("mediapipe/resources/heart.png");
   k_gesture_image_map_[GestureType::THE_103] =
       cv::imread("mediapipe/resources/103.png");
+  k_gesture_image_map_[GestureType::RYOIKI_TENKAI] =
+      cv::imread("mediapipe/resources/ryoiki_tenkai.jpg");
 
   k_operation_image_map_[ResultType::WIN] =
       cv::imread("mediapipe/resources/win_operation.png");
@@ -52,6 +55,7 @@ PostProcessor::PostProcessor() {
   k_gesture_and_rule_map_[GestureType::PA] = RuleType::JANKEN;
   k_gesture_and_rule_map_[GestureType::HEART] = RuleType::IMITATION;
   k_gesture_and_rule_map_[GestureType::THE_103] = RuleType::IMITATION;
+  k_gesture_and_rule_map_[GestureType::RYOIKI_TENKAI] = RuleType::IMITATION;
 
   k_th_score_ = 0.75;
 
@@ -84,11 +88,11 @@ void PostProcessor::Execute(
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
     cv::Mat *output_frame_for_display,
     std::chrono::system_clock::time_point *start_time, bool *grab_frames) {
-#if 1
+#if 0
   cv::Mat landmark_image = camera_frame_raw;
 #else
-  // cv::Mat landmark_image;
-  // VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
+  cv::Mat landmark_image;
+  VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
 #endif
 
   for (int i = 0; i < landmarks_list->size(); i++) {
@@ -104,14 +108,14 @@ void PostProcessor::Execute(
   output_frame_display_right = cv::Mat::zeros(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-  std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES));
+  std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES) - 1);
 
   auto current_recognized_type = GestureType::UNKNOWN;
   if (landmarks_list->size() == 0) {
     VisUtility::Overlap(output_frame_display_right, k_description_image_,
-                        (camera_frame_raw.rows - k_description_image_.cols) / 2,
+                        (camera_frame_raw.rows - k_description_image_.cols) / 2 + 45,
                         (camera_frame_raw.rows - k_description_image_.rows) / 2,
-                        k_description_image_.cols, k_description_image_.rows);
+                        k_description_image_.cols * 0.8, k_description_image_.rows * 0.8);
   } else {
     // else if (landmarks_list.size() == 1) {
     // 片手 -> 両手でもおｋにした。
@@ -177,7 +181,7 @@ void PostProcessor::Execute(
   }
   cv::putText(
       output_frame_display_right, std::string("Quit: <ESC>"),
-      cv::Point(camera_frame_raw.rows - 140, camera_frame_raw.rows - 10), 1,
+      cv::Point(camera_frame_raw.rows - 130, camera_frame_raw.rows - 10), 1,
       1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
   // Update all status-buffer.
@@ -199,6 +203,9 @@ void PostProcessor::Execute(
     // ジェスチャー確定処理 ---
 
     // 合否結果を表示しているときは更新しない。
+    // for (auto status : new_status_list) std::cout << (int)status << " ";
+    // std::cout << std::endl;
+
     StatusBufferProcessor::Update(new_status_list, &status_buffer_list_);
 
     std::vector<float> score_list;
@@ -212,6 +219,8 @@ void PostProcessor::Execute(
         max_score = score_list[i];
       }
     }
+    // std::cout << status_buffer_list_.size() << " " << score_list.size() << " " << (int)candidate_of_gesture_type << std::endl;
+    // std::cout << (int)GestureType::RYOIKI_TENKAI << " " << (int)GestureType::NUM_GESTURES << std::endl;
 
     // Judgement
     // --- ジェスチャー確定処理

@@ -106,6 +106,45 @@ const GestureType PaGestureEstimator::Recognize(
     return ret_type;
 }
 
+const GestureType RyoikiTenkaiGestureEstimator::Recognize(
+    const std::vector<mediapipe::NormalizedLandmarkList>
+        &hand_landmarks_list) {
+
+    // TODO: 右か左かの判定を行う。
+
+    auto &landms = hand_landmarks_list[0];
+    if (landms.landmark_size() != 21) return GestureType::UNKNOWN;
+
+    const bool index_nodes_status =
+        landms.landmark(5).y() > landms.landmark(6).y() &&
+        landms.landmark(6).y() > landms.landmark(7).y() &&
+        landms.landmark(7).y() > landms.landmark(8).y();
+
+    const float eps = 0.08;
+    const bool index_and_middle_nodes_status =
+        abs(landms.landmark(8).x() - landms.landmark(12).x()) < eps;
+
+    const bool middle_nodes_status =
+        landms.landmark(9).y() > landms.landmark(10).y() &&
+        landms.landmark(10).y() > landms.landmark(11).y() &&
+        landms.landmark(11).y() > landms.landmark(12).y();
+
+    const bool ring_nodes_status =
+        landms.landmark(14).y() < landms.landmark(15).y() &&
+        landms.landmark(14).y() < landms.landmark(16).y();
+
+    const bool pinky_nodes_status =
+        landms.landmark(18).y() < landms.landmark(19).y() &&
+        landms.landmark(18).y() < landms.landmark(20).y();
+
+    GestureType ret_type = GestureType::UNKNOWN;
+    if (index_nodes_status && index_and_middle_nodes_status &&
+        middle_nodes_status && ring_nodes_status && pinky_nodes_status)
+        ret_type = GestureType::RYOIKI_TENKAI;
+
+    return ret_type;
+}
+
 const GestureType HeartGestureEstimator::Recognize(
     const std::vector<mediapipe::NormalizedLandmarkList> &hand_landmarks_list) {
     if (hand_landmarks_list.size() != 2) return GestureType::UNKNOWN;

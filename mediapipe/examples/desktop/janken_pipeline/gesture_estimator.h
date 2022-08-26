@@ -2,11 +2,20 @@
 #pragma once
 
 #include <vector>
+#include <utility>
+#include <map>
 #include "mediapipe/framework/formats/landmark.pb.h"
 
 enum HandType {
     LEFT_HAND = 0,
     RIGHT_HAND = 1,
+};
+
+enum class RuleType {
+  UNKNOWN,
+  JANKEN,
+  IMITATION,
+  NUM_RULES,
 };
 
 enum class GestureType {

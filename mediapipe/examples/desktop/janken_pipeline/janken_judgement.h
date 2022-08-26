@@ -6,12 +6,11 @@
 
 // cite: https://github.com/ksato-dev/JankenExercise
 // TODO: Convert enum to vector<pair<ResultType, RuleType>>
-enum ResultType {
+enum class ResultType {
   UNKNOWN,
   WIN,
   LOSE,
   DRAW,
-  IMITAION,
   NUM_RESULT_TYPES,
 };
 

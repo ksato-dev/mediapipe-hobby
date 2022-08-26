@@ -90,18 +90,18 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   std::vector<StatusBuffer> status_buffer_list;
   StatusBufferProcessor::Initialize(kBufferSize, &status_buffer_list);
 
-  std::map<ResultType, cv::Mat> kOperationImageMap;
-  kOperationImageMap[ResultType::WIN] =
-      cv::imread("mediapipe/resources/win_operation.png");
-  kOperationImageMap[ResultType::LOSE] =
-      cv::imread("mediapipe/resources/loss_operation.png");
-  kOperationImageMap[ResultType::DRAW] =
-      cv::imread("mediapipe/resources/draw_operation.png");
+//   std::map<ResultType, cv::Mat> kOperationImageMap;
+//   kOperationImageMap[ResultType::WIN] =
+//       cv::imread("mediapipe/resources/win_operation.png");
+//   kOperationImageMap[ResultType::LOSE] =
+//       cv::imread("mediapipe/resources/loss_operation.png");
+//   kOperationImageMap[ResultType::DRAW] =
+//       cv::imread("mediapipe/resources/draw_operation.png");
 
-  const cv::Mat description_image =
-      cv::imread("mediapipe/resources/description.png");
-  const cv::Mat your_hand_image =
-      cv::imread("mediapipe/resources/your_hand.png");
+//   const cv::Mat description_image =
+//       cv::imread("mediapipe/resources/description.png");
+//   const cv::Mat your_hand_image =
+//       cv::imread("mediapipe/resources/your_hand.png");
 
   // std::random_device rnd;  // 非決定的な乱数生成器
   // std::mt19937_64 mt(

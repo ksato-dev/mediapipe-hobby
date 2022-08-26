@@ -8,6 +8,7 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 
+
 // TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 20.0;
@@ -46,20 +47,35 @@ PostProcessor::PostProcessor() {
   k_operation_image_map_[ResultType::DRAW] =
       cv::imread("mediapipe/resources/draw_operation.png");
 
+  k_gesture_and_rule_map_[GestureType::GU] = RuleType::JANKEN;
+  k_gesture_and_rule_map_[GestureType::CHOKI] = RuleType::JANKEN;
+  k_gesture_and_rule_map_[GestureType::PA] = RuleType::JANKEN;
+  k_gesture_and_rule_map_[GestureType::HEART] = RuleType::IMITATION;
+  k_gesture_and_rule_map_[GestureType::THE_103] = RuleType::IMITATION;
+
   k_th_score_ = 0.75;
 
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
-  k_operation_rand_n_ =
-      std::uniform_int_distribution<>(1, (int)(ResultType::NUM_RESULT_TYPES)-2);
-  // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+
   k_opposite_gesture_rand_n_ = std::uniform_int_distribution<>(
-      1,
-      (int)(GestureType::NUM_GESTURES)-3);  // [1, n-1]
-                                                  // 範囲の一様乱数,
-                                                  // UNKNOWMN, HEART はスキップ
-  operation_ = ResultType(k_operation_rand_n_(k_mt_));
+      (int)(GestureType::UNKNOWN) + 1, (int)(GestureType::NUM_GESTURES)-1);
+  // [1, n - 1] 範囲の一様乱数, UNKNOWN, NUM_GESTURES はスキップ
+
+  k_janken_operation_rand_n_ =
+      std::uniform_int_distribution<>(1, (int)(ResultType::NUM_RESULT_TYPES)-1);
+  // [1, n - 1] 範囲の一様乱数, UNKNOWN, NUM_RESULT_TYPES はスキップ
+
+  // まずジェスチャーを乱数で決めて、その後マップからルールタイプを参照し、それに応じてオペレーションを決定する。
   opposite_gesture_ = GestureType(k_opposite_gesture_rand_n_(k_mt_));
+  // opposite_gesture_ = GestureType(k_opposite_gesture_rand_n_(k_mt_));
+  rule_ = k_gesture_and_rule_map_[opposite_gesture_];
+
+  if (rule_ == RuleType::JANKEN) {
+    operation_ = ResultType(k_janken_operation_rand_n_(k_mt_));
+  } else {
+    operation_ = ResultType::UNKNOWN;
+  }
 }
 
 // TODO: refactor a code below
@@ -107,7 +123,7 @@ void PostProcessor::Execute(
           estimator->Recognize(*landmarks_list);
       if (temp_recognized_type != GestureType::UNKNOWN) {
         gesture_image = k_gesture_image_map_[temp_recognized_type];
-        current_recognized_type = temp_recognized_type;
+        current_recognized_type = temp_recognized_type;  // ジェスチャー仮確定
       }
     }
     if (gesture_image.empty()) {
@@ -180,6 +196,8 @@ void PostProcessor::Execute(
                100, cv::Scalar(0, 255, 0), 5, cv::LINE_4);
     num_frames_since_resetting++;
   } else {
+    // ジェスチャー確定処理 ---
+
     // 合否結果を表示しているときは更新しない。
     StatusBufferProcessor::Update(new_status_list, &status_buffer_list_);
 
@@ -194,35 +212,51 @@ void PostProcessor::Execute(
         max_score = score_list[i];
       }
     }
-    // std::cout << "GestureType: " << (int)(candidate_of_gesture_type) <<
-    // std::endl;
 
     // Judgement
-    const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
-        candidate_of_gesture_type, opposite_gesture_);
+    // --- ジェスチャー確定処理
 
     // スコアを更新するタイミングでは次のお題を表示しない。
-    const bool flag_for_update = (current_result_type == operation_);
+    bool flag_for_update;
+    if (rule_ == RuleType::JANKEN) {
+      const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
+          candidate_of_gesture_type, opposite_gesture_);
+      flag_for_update = (current_result_type == operation_);
+    }
+    else if (rule_ == RuleType::IMITATION)
+      flag_for_update = (candidate_of_gesture_type == opposite_gesture_);
+
     if (flag_for_update && k_th_score_ < max_score) {
       win_cnt_++;
 
       // 相手の次の手は今のと重複しないようにする。
-      // GestureType pre_oppo_gesture = candidate_of_gesture_type;
-
       GestureType next_correct_gesture_type = candidate_of_gesture_type;
       while (candidate_of_gesture_type == next_correct_gesture_type) {
         GestureType next_opposite_gesture =
             GestureType(k_opposite_gesture_rand_n_(k_mt_));
-        ResultType next_operation = ResultType(k_operation_rand_n_(k_mt_));
-        ResultType next_result_type = JankenJudgement::JudgeNormalJanken(
-            candidate_of_gesture_type, next_opposite_gesture);
+        RuleType next_rule = k_gesture_and_rule_map_[next_opposite_gesture];
 
-        const bool next_flag_for_update = (next_result_type == next_operation);
+        ResultType next_operation;
+        ResultType next_result_type;
+        bool next_flag_for_update;
+
+        if (next_rule == RuleType::JANKEN) {
+          next_operation =
+              ResultType(k_janken_operation_rand_n_(k_mt_));
+          next_result_type = JankenJudgement::JudgeNormalJanken(
+              candidate_of_gesture_type, next_opposite_gesture);
+          next_flag_for_update = (next_result_type == next_operation);
+        }
+        else if (next_rule == RuleType::IMITATION) {
+          next_operation =
+              ResultType::UNKNOWN;
+          next_flag_for_update = (candidate_of_gesture_type == next_opposite_gesture);
+        }
 
         if (!next_flag_for_update) {
           operation_ = next_operation;
           opposite_gesture_ = next_opposite_gesture;
-
+          rule_ = next_rule;
           break;
         }
       }
@@ -237,7 +271,12 @@ void PostProcessor::Execute(
       // std::cout << "resize3" << std::endl;
       cv::resize(output_frame_display_left, output_frame_display_left,
                  cv::Size(camera_frame_raw.rows, camera_frame_raw.rows));
-      auto &ope_image = k_operation_image_map_[operation_];
+      cv::Mat ope_image;
+
+      if (rule_ == RuleType::JANKEN)
+        ope_image = k_operation_image_map_[operation_];
+      else if (rule_ == RuleType::IMITATION)
+        ope_image = cv::imread("mediapipe/resources/imitation_operation.png");
 
       // 全体の横幅がカメラフレームの縦幅と同じなので注意。
       VisUtility::Overlap(output_frame_display_left, ope_image,

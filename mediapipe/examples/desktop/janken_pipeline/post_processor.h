@@ -46,11 +46,15 @@ class PostProcessor {
   double k_th_score_;
   std::mt19937_64 k_mt_;  // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
   std::uniform_int_distribution<>
-      k_operation_rand_n_;  // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
+      k_janken_operation_rand_n_;  // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> k_opposite_gesture_rand_n_;
 
   ResultType operation_;
   GestureType opposite_gesture_;
+  RuleType rule_;
+
+  // GestureType をひっかけてルールタイプを取り出す。
+  std::map<GestureType, RuleType> k_gesture_and_rule_map_;
 
   std::vector<StatusBuffer> status_buffer_list_;
   int time_since_resetting_;  // 初期値がゼロだとはじめに〇が出てしまう。

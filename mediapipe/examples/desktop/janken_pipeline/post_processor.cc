@@ -351,18 +351,18 @@ void PostProcessor::Execute(
     cv::putText(
         result_image, std::string("Your Score: ") + std::to_string(win_cnt_),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
-        cv::Point(30, camera_frame_raw.rows / 2 - 35), 2, 1.5,
+        cv::Point(30, camera_frame_raw.rows / 2 - 40), 2, 1.5,
         cv::Scalar(0, 255, 0), 2, cv::LINE_4);
     cv::putText(
         result_image, std::string("Restart: <Space>"),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
         cv::Point(30, camera_frame_raw.rows / 2 + 20), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+        cv::Scalar(255, 255, 0), 2, cv::LINE_4);
     cv::putText(
         result_image, std::string("Quit: <ESC>"),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
-        cv::Point(30, camera_frame_raw.rows / 2 + 75), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+        cv::Point(30, camera_frame_raw.rows / 2 + 80), 2, 1.5,
+        cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
     const cv::Mat instruction_image =
         cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);

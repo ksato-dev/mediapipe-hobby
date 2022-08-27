@@ -15,9 +15,8 @@ class VisUtility {
   static void DrawFrameLines(const mediapipe::NormalizedLandmarkList &landmarks,
                              const cv::Mat &camera_frame_raw,
                              cv::Mat *output_frame_display_right);
-  static void BlurImage(const cv::Size &gauss_kernel,
-                                    const cv::Mat &src_image,
-                                    cv::Mat *dst_image);
+  static void BlurImage(const cv::Size &gauss_kernel, const cv::Mat &src_image,
+                        cv::Mat *dst_image);
 
  private:
   static const std::vector<std::vector<int>> connection_list_;

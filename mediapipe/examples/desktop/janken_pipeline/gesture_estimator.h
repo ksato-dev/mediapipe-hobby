@@ -8,6 +8,8 @@
 #include "mediapipe/framework/formats/landmark.pb.h"
 
 
+// TODO: 公式のコードを見て、左右判定をできるようにする。
+
 enum HandType {
   LEFT_HAND = 0,
   RIGHT_HAND = 1,

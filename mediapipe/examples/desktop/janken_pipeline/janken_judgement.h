@@ -5,7 +5,6 @@
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 
 // cite: https://github.com/ksato-dev/JankenExercise
-// TODO: Convert enum to vector<pair<ResultType, RuleType>>
 enum class ResultType {
   UNKNOWN,
   WIN,

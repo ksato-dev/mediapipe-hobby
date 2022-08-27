@@ -8,7 +8,6 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 
-
 // TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 30.0;
@@ -51,7 +50,8 @@ PostProcessor::PostProcessor() {
       cv::imread("mediapipe/resources/draw_operation.png");
 
   k_imitation_operation_image_map_[GestureType::HEART] =
-      cv::imread("mediapipe/resources/imitation_operation.png");
+      cv::imread("mediapipe/resources/heart_operaion.png");
+  // cv::imread("mediapipe/resources/imitation_operation.png");
   k_imitation_operation_image_map_[GestureType::THE_103] =
       cv::imread("mediapipe/resources/103_age_tanome_operation.png");
   k_imitation_operation_image_map_[GestureType::RYOIKI_TENKAI] =
@@ -115,14 +115,15 @@ void PostProcessor::Execute(
   output_frame_display_right = cv::Mat::zeros(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 
-  std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES) - 1);
+  std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES)-1);
 
   auto current_recognized_type = GestureType::UNKNOWN;
   if (landmarks_list->size() == 0) {
-    VisUtility::Overlap(output_frame_display_right, k_description_image_,
-                        (camera_frame_raw.rows - k_description_image_.cols) / 2 + 45,
-                        (camera_frame_raw.rows - k_description_image_.rows) / 2,
-                        k_description_image_.cols * 0.8, k_description_image_.rows * 0.8);
+    VisUtility::Overlap(
+        output_frame_display_right, k_description_image_,
+        (camera_frame_raw.rows - k_description_image_.cols) / 2 + 45,
+        (camera_frame_raw.rows - k_description_image_.rows) / 2,
+        k_description_image_.cols * 0.8, k_description_image_.rows * 0.8);
   } else {
     // else if (landmarks_list.size() == 1) {
     // 片手 -> 両手でもおｋにした。
@@ -174,9 +175,9 @@ void PostProcessor::Execute(
         std::roundl(gesture_image.cols * resize_ratio);
     const int resized_gesture_image_height =
         std::roundl(gesture_image.rows * resize_ratio);
-    cv::resize(gesture_image, gesture_image,
-               cv::Size(resized_gesture_image_width,
-                        resized_gesture_image_height));
+    cv::resize(
+        gesture_image, gesture_image,
+        cv::Size(resized_gesture_image_width, resized_gesture_image_height));
 
     cv::Mat overlap_image;
     cv::hconcat(k_your_hand_image_, gesture_image, overlap_image);
@@ -188,7 +189,7 @@ void PostProcessor::Execute(
   }
   cv::putText(
       output_frame_display_right, std::string("Quit: <ESC>"),
-      cv::Point(camera_frame_raw.rows - 130, camera_frame_raw.rows - 10), 1,
+      cv::Point(camera_frame_raw.rows - 125, camera_frame_raw.rows - 12), 1,
       1.2, cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
   // Update all status-buffer.
@@ -226,8 +227,10 @@ void PostProcessor::Execute(
         max_score = score_list[i];
       }
     }
-    // std::cout << status_buffer_list_.size() << " " << score_list.size() << " " << (int)candidate_of_gesture_type << std::endl;
-    // std::cout << (int)GestureType::RYOIKI_TENKAI << " " << (int)GestureType::NUM_GESTURES << std::endl;
+    // std::cout << status_buffer_list_.size() << " " << score_list.size() << "
+    // " << (int)candidate_of_gesture_type << std::endl; std::cout <<
+    // (int)GestureType::RYOIKI_TENKAI << " " << (int)GestureType::NUM_GESTURES
+    // << std::endl;
 
     // Judgement
     // --- ジェスチャー確定処理
@@ -238,8 +241,7 @@ void PostProcessor::Execute(
       const ResultType current_result_type = JankenJudgement::JudgeNormalJanken(
           candidate_of_gesture_type, opposite_gesture_);
       flag_for_update = (current_result_type == operation_);
-    }
-    else if (rule_ == RuleType::IMITATION)
+    } else if (rule_ == RuleType::IMITATION)
       flag_for_update = (candidate_of_gesture_type == opposite_gesture_);
 
     if (flag_for_update && k_th_score_ < max_score) {
@@ -257,16 +259,14 @@ void PostProcessor::Execute(
         bool next_flag_for_update;
 
         if (next_rule == RuleType::JANKEN) {
-          next_operation =
-              ResultType(k_janken_operation_rand_n_(k_mt_));
+          next_operation = ResultType(k_janken_operation_rand_n_(k_mt_));
           next_result_type = JankenJudgement::JudgeNormalJanken(
               candidate_of_gesture_type, next_opposite_gesture);
           next_flag_for_update = (next_result_type == next_operation);
-        }
-        else if (next_rule == RuleType::IMITATION) {
-          next_operation =
-              ResultType::UNKNOWN;
-          next_flag_for_update = (candidate_of_gesture_type == next_opposite_gesture);
+        } else if (next_rule == RuleType::IMITATION) {
+          next_operation = ResultType::UNKNOWN;
+          next_flag_for_update =
+              (candidate_of_gesture_type == next_opposite_gesture);
         }
 
         if (!next_flag_for_update) {

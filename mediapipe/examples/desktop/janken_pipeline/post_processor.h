@@ -2,30 +2,23 @@
 #include <chrono>
 #include <memory>
 #include <opencv2/opencv.hpp>
-#include <vector>
 #include <random>
+#include <vector>
 
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/framework/formats/landmark.pb.h"
 
+
 class PostProcessor {
  public:
   PostProcessor();
-  void Execute(
-      const cv::Mat &camera_frame_raw,
-      std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
-      cv::Mat *output_frame_for_display,
-      std::chrono::system_clock::time_point *start_time_, bool *grab_frames);
-  // void Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width,
-  //                     int height);
-  // void DrawNodePoints(const mediapipe::NormalizedLandmarkList &landmarks,
-  //                            const cv::Mat &camera_frame_raw,
-  //                            cv::Mat *output_frame_display_right);
-  // void DrawFrameLines(const mediapipe::NormalizedLandmarkList &landmarks,
-  //                            const cv::Mat &camera_frame_raw,
-  //                            cv::Mat *output_frame_display_right);
+  void Execute(const cv::Mat &camera_frame_raw,
+               std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
+               cv::Mat *output_frame_for_display,
+               std::chrono::system_clock::time_point *start_time_,
+               bool *grab_frames);
 
  private:
   std::string k_window_name_;
@@ -45,7 +38,8 @@ class PostProcessor {
   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
-  std::mt19937_64 k_mt_;  // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
+  std::mt19937_64
+      k_mt_;  // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード
   std::uniform_int_distribution<>
       k_janken_operation_rand_n_;  // [1, n] 範囲の一様乱数, UNKNOWN はスキップ
   std::uniform_int_distribution<> k_opposite_gesture_rand_n_;

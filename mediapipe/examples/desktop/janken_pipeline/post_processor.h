@@ -41,7 +41,8 @@ class PostProcessor {
       k_hand_estimator_list_;
 
   std::map<GestureType, cv::Mat> k_gesture_image_map_;
-  std::map<ResultType, cv::Mat> k_operation_image_map_;
+  std::map<ResultType, cv::Mat> k_janken_operation_image_map_;
+  std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
   std::mt19937_64 k_mt_;  // メルセンヌ・ツイスタの 64 ビット版、引数は初期シード

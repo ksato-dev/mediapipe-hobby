@@ -11,11 +11,11 @@
 
 // TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
 PostProcessor::PostProcessor() {
-  k_limit_time_sec_ = 20.0;
+  k_limit_time_sec_ = 30.0;
   k_window_name_ = "Gesture++ (beta version)";
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
-  k_buffer_size_ = 17;
+  k_buffer_size_ = 13;
 
   k_description_image_ = cv::imread("mediapipe/resources/description.png");
   k_your_hand_image_ = cv::imread("mediapipe/resources/your_hand.png");
@@ -41,14 +41,21 @@ PostProcessor::PostProcessor() {
   k_gesture_image_map_[GestureType::THE_103] =
       cv::imread("mediapipe/resources/103.png");
   k_gesture_image_map_[GestureType::RYOIKI_TENKAI] =
-      cv::imread("mediapipe/resources/ryoiki_tenkai.jpg");
+      cv::imread("mediapipe/resources/ryoiki_tenkai.png");
 
-  k_operation_image_map_[ResultType::WIN] =
+  k_janken_operation_image_map_[ResultType::WIN] =
       cv::imread("mediapipe/resources/win_operation.png");
-  k_operation_image_map_[ResultType::LOSE] =
+  k_janken_operation_image_map_[ResultType::LOSE] =
       cv::imread("mediapipe/resources/loss_operation.png");
-  k_operation_image_map_[ResultType::DRAW] =
+  k_janken_operation_image_map_[ResultType::DRAW] =
       cv::imread("mediapipe/resources/draw_operation.png");
+
+  k_imitation_operation_image_map_[GestureType::HEART] =
+      cv::imread("mediapipe/resources/imitation_operation.png");
+  k_imitation_operation_image_map_[GestureType::THE_103] =
+      cv::imread("mediapipe/resources/103_age_tanome_operation.png");
+  k_imitation_operation_image_map_[GestureType::RYOIKI_TENKAI] =
+      cv::imread("mediapipe/resources/ryoiki_tenkai_operation.png");
 
   k_gesture_and_rule_map_[GestureType::GU] = RuleType::JANKEN;
   k_gesture_and_rule_map_[GestureType::CHOKI] = RuleType::JANKEN;
@@ -57,7 +64,7 @@ PostProcessor::PostProcessor() {
   k_gesture_and_rule_map_[GestureType::THE_103] = RuleType::IMITATION;
   k_gesture_and_rule_map_[GestureType::RYOIKI_TENKAI] = RuleType::IMITATION;
 
-  k_th_score_ = 0.75;
+  k_th_score_ = 0.80;
 
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
@@ -283,9 +290,9 @@ void PostProcessor::Execute(
       cv::Mat ope_image;
 
       if (rule_ == RuleType::JANKEN)
-        ope_image = k_operation_image_map_[operation_];
+        ope_image = k_janken_operation_image_map_[operation_];
       else if (rule_ == RuleType::IMITATION)
-        ope_image = cv::imread("mediapipe/resources/imitation_operation.png");
+        ope_image = k_imitation_operation_image_map_[opposite_gesture_];
 
       // 全体の横幅がカメラフレームの縦幅と同じなので注意。
       VisUtility::Overlap(output_frame_display_left, ope_image,

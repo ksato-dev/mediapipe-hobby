@@ -47,7 +47,7 @@ const GestureType ChokiGestureEstimator::Recognize(
         landms.landmark(6).y() > landms.landmark(7).y() &&
         landms.landmark(7).y() > landms.landmark(8).y();
 
-    const float eps = 0.08;
+    const float eps = 0.05;
     const bool index_and_middle_nodes_status =
         abs(landms.landmark(8).x() - landms.landmark(12).x()) > eps;
 
@@ -115,19 +115,36 @@ const GestureType RyoikiTenkaiGestureEstimator::Recognize(
     auto &landms = hand_landmarks_list[0];
     if (landms.landmark_size() != 21) return GestureType::UNKNOWN;
 
+    // 領域展開のポーズから右手かどうか判定
+    const bool whether_right_hand =
+        landms.landmark(18).x() < landms.landmark(2).x() &&
+        landms.landmark(14).z() < landms.landmark(2).z() &&
+        landms.landmark(14).z() < landms.landmark(7).z() &&
+        landms.landmark(18).z() < landms.landmark(2).z() &&
+        landms.landmark(18).z() < landms.landmark(7).z();
+
     const bool index_nodes_status =
         landms.landmark(5).y() > landms.landmark(6).y() &&
         landms.landmark(6).y() > landms.landmark(7).y() &&
         landms.landmark(7).y() > landms.landmark(8).y();
 
-    const float eps = 0.08;
-    const bool index_and_middle_nodes_status =
+    const bool index_and_middle_nodes_status1 =
+        landms.landmark(10).x() < landms.landmark(7).x() &&
+        landms.landmark(10).x() < landms.landmark(6).x() &&
+        landms.landmark(10).x() < landms.landmark(5).x();
+        // landms.landmark(8).y() < landms.landmark(12).y() && 
+
+    const float eps = 0.03;
+    const bool index_and_middle_nodes_status2 =
         abs(landms.landmark(8).x() - landms.landmark(12).x()) < eps;
 
     const bool middle_nodes_status =
         landms.landmark(9).y() > landms.landmark(10).y() &&
         landms.landmark(10).y() > landms.landmark(11).y() &&
         landms.landmark(11).y() > landms.landmark(12).y();
+
+        landms.landmark(14).y() < landms.landmark(15).y() &&
+        landms.landmark(14).y() < landms.landmark(16).y();
 
     const bool ring_nodes_status =
         landms.landmark(14).y() < landms.landmark(15).y() &&
@@ -138,7 +155,8 @@ const GestureType RyoikiTenkaiGestureEstimator::Recognize(
         landms.landmark(18).y() < landms.landmark(20).y();
 
     GestureType ret_type = GestureType::UNKNOWN;
-    if (index_nodes_status && index_and_middle_nodes_status &&
+    if (whether_right_hand && index_nodes_status &&
+        index_and_middle_nodes_status1 && index_and_middle_nodes_status2 &&
         middle_nodes_status && ring_nodes_status && pinky_nodes_status)
         ret_type = GestureType::RYOIKI_TENKAI;
 

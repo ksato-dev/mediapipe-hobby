@@ -25,7 +25,6 @@ class PostProcessor {
   double k_limit_time_sec_;
   int k_cv_waitkey_esc_;
   int k_cv_waitkey_spase_;
-  int k_buffer_size_;
 
   cv::Mat k_description_image_;
   cv::Mat k_your_hand_image_;

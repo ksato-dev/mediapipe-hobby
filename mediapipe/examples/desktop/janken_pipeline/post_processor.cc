@@ -8,13 +8,14 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 
-// TODO: 機能追加：1. ハートのポーズ出題, 2. 呪術廻戦のポーズ認識・出題
+// #define BLACK_BACKGROUND
+
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 30.0;
-  k_window_name_ = "Gesture++ (beta version)";
+  // k_window_name_ = "Gesture++ (beta version)";
+  k_window_name_ = "Gesture++ (YDK addition)";
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
-  k_buffer_size_ = 13;
 
   k_description_image_ = cv::imread("mediapipe/resources/description.png");
   k_your_hand_image_ = cv::imread("mediapipe/resources/your_hand.png");
@@ -53,7 +54,8 @@ PostProcessor::PostProcessor() {
       cv::imread("mediapipe/resources/heart_operaion.png");
   // cv::imread("mediapipe/resources/imitation_operation.png");
   k_imitation_operation_image_map_[GestureType::THE_103] =
-      cv::imread("mediapipe/resources/103_age_tanome_operation.png");
+      cv::imread("mediapipe/resources/103_operation.png");
+      // cv::imread("mediapipe/resources/103_age_tanome_operation.png");
   k_imitation_operation_image_map_[GestureType::RYOIKI_TENKAI] =
       cv::imread("mediapipe/resources/ryoiki_tenkai_operation.png");
 
@@ -64,7 +66,7 @@ PostProcessor::PostProcessor() {
   k_gesture_and_rule_map_[GestureType::THE_103] = RuleType::IMITATION;
   k_gesture_and_rule_map_[GestureType::RYOIKI_TENKAI] = RuleType::IMITATION;
 
-  k_th_score_ = 0.80;
+  k_th_score_ = 0.70;
 
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
@@ -95,8 +97,16 @@ void PostProcessor::Execute(
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
     cv::Mat *output_frame_for_display,
     std::chrono::system_clock::time_point *start_time, bool *grab_frames) {
-#if 0
-  cv::Mat landmark_image = camera_frame_raw;
+#if 1
+  // cv::Mat landmark_image = camera_frame_raw;
+#ifdef BLACK_BACKGROUND
+  cv::Mat landmark_image = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
+#else
+  cv::Mat landmark_image;
+  VisUtility::CreateAnyColorImage(
+      // cv::Vec3b(203, 192, 255),
+      cv::Vec3b(243, 161, 130), camera_frame_raw.size(), &landmark_image);
+#endif
 #else
   cv::Mat landmark_image;
   VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
@@ -112,8 +122,16 @@ void PostProcessor::Execute(
   }
 
   cv::Mat output_frame_display_right;
+#ifdef BLACK_BACKGROUND
   output_frame_display_right = cv::Mat::zeros(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+#else
+  VisUtility::CreateAnyColorImage(
+      cv::Vec3b(203, 192, 255),
+      // cv::Vec3b(243, 161, 130),
+      cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
+      &output_frame_display_right);
+#endif
 
   std::vector<bool> new_status_list((int)(GestureType::NUM_GESTURES)-1);
 
@@ -139,8 +157,15 @@ void PostProcessor::Execute(
       }
     }
     if (gesture_image.empty()) {
+#ifdef BLACK_BACKGROUND
       gesture_image = cv::Mat::zeros(
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+#else
+      VisUtility::CreateAnyColorImage(
+          cv::Vec3b(243, 161, 130),
+          cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
+          &gesture_image);
+#endif
     } else {
       // std::cout << "resize1" << std::endl;
       cv::resize(gesture_image, gesture_image,
@@ -148,8 +173,16 @@ void PostProcessor::Execute(
     }
 
     // 背景を黒塗り
+#ifdef BLACK_BACKGROUND
     output_frame_display_right = cv::Mat::zeros(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+#else
+    VisUtility::CreateAnyColorImage(
+        cv::Vec3b(203, 192, 255),
+          // cv::Vec3b(243, 161, 130),
+        cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
+        &output_frame_display_right);
+#endif
 
     // 背景の上に手のランドマークを描画
     // カメラの高さの合わせてランドマーク画像の幅をリサイズするための倍率
@@ -195,13 +228,21 @@ void PostProcessor::Execute(
   // Update all status-buffer.
   new_status_list[(int)(current_recognized_type)] = true;
 
+#ifdef BLACK_BACKGROUND
   cv::Mat output_frame_display_left = cv::Mat::zeros(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
+#else
+    cv::Mat output_frame_display_left;
+    VisUtility::CreateAnyColorImage(
+        cv::Vec3b(203, 192, 255),
+        cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
+        &output_frame_display_left);
+#endif
 
   if (num_frames_since_resetting < 10) {
     // 合否表示注はバッファをクリアしておく。
     status_buffer_list_ = std::vector<StatusBuffer>();
-    StatusBufferProcessor::Initialize(k_buffer_size_, &status_buffer_list_);
+    StatusBufferProcessor::Initialize(&status_buffer_list_);
 
     cv::circle(output_frame_display_left,
                cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
@@ -279,7 +320,7 @@ void PostProcessor::Execute(
 
       num_frames_since_resetting = 0;
     } else {
-      // CreateWhiteImage(cv::Size(camera_frame_raw.rows,
+      // CreateAnyColorImage(cv::Size(camera_frame_raw.rows,
       // camera_frame_raw.rows),
       //                  &output_frame_display_left);
       output_frame_display_left = k_gesture_image_map_[opposite_gesture_];
@@ -323,13 +364,13 @@ void PostProcessor::Execute(
   cv::putText(
       output_frame_display_left, std::string("Limit: ") + ss.str(),
       cv::Point(camera_frame_raw.rows - 170, camera_frame_raw.rows - 20), 2,
-      0.8, cv::Scalar(0, 255, 255), 2, cv::LINE_4);
+      0.8, cv::Scalar(0, 0, 255), 2, cv::LINE_4);
 
   // display score
   cv::putText(output_frame_display_left,
               std::string("Score: ") + std::to_string(win_cnt_),
               cv::Point(20, camera_frame_raw.rows - 20), 2, 0.8,
-              cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+              cv::Scalar(243, 161, 130), 2, cv::LINE_4);
 
   // cv::circle(*output_frame_display_right, cv::Point(x, y), 2, cv::Scalar(0,
   // 0, 255), 4,
@@ -346,13 +387,20 @@ void PostProcessor::Execute(
   // Press any key to exit.
 
   if (time_left_sec <= 0) {
+#ifdef BLACK_BACKGROUND
     const cv::Mat result_image =
         cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
+#else
+    cv::Mat result_image;
+    VisUtility::CreateAnyColorImage(cv::Vec3b(203, 192, 255),
+                                    output_frame_display_left.size(),
+                                    &result_image);
+#endif
     cv::putText(
         result_image, std::string("Your Score: ") + std::to_string(win_cnt_),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
         cv::Point(30, camera_frame_raw.rows / 2 - 40), 2, 1.5,
-        cv::Scalar(0, 255, 0), 2, cv::LINE_4);
+        cv::Scalar(243, 161, 130), 2, cv::LINE_4);
     cv::putText(
         result_image, std::string("Restart: <Space>"),
         // cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
@@ -364,12 +412,21 @@ void PostProcessor::Execute(
         cv::Point(30, camera_frame_raw.rows / 2 + 80), 2, 1.5,
         cv::Scalar(255, 255, 255), 2, cv::LINE_4);
 
+#ifdef BLACK_BACKGROUND
     const cv::Mat instruction_image =
         cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
+#else
+    cv::Mat instruction_image;
+    VisUtility::CreateAnyColorImage(cv::Vec3b(203, 192, 255),
+                                    output_frame_display_left.size(),
+                                    &instruction_image);
+#endif
+
     cv::hconcat(result_image, instruction_image, *output_frame_for_display);
     cv::imshow(k_window_name_, *output_frame_for_display);
     const int pressed_key = cv::waitKey(0);
     if (pressed_key == k_cv_waitkey_esc_) {
+      // TODO: アプリ右上の x ボタンを押した時も閉じるようにする。
       // terminate
       *grab_frames = false;
     } else if (pressed_key == k_cv_waitkey_spase_) {
@@ -377,7 +434,7 @@ void PostProcessor::Execute(
       *start_time = std::chrono::system_clock::now();
       win_cnt_ = 0;
       status_buffer_list_ = std::vector<StatusBuffer>();
-      StatusBufferProcessor::Initialize(k_buffer_size_, &status_buffer_list_);
+      StatusBufferProcessor::Initialize(&status_buffer_list_);
     }
   } else {
     const int pressed_key = cv::waitKey(1);

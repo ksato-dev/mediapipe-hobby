@@ -10,15 +10,15 @@ const std::vector<std::vector<int>> VisUtility::connection_list_ = {
 };
 
 // 白画像を作る関数
-void VisUtility::CreateWhiteImage(const cv::Size &size, cv::Mat *output_image) {
+void VisUtility::CreateAnyColorImage(const cv::Vec3b &color, const cv::Size &size, cv::Mat *output_image) {
   *output_image = cv::Mat::zeros(size, CV_8UC3);
   int cols = output_image->cols;
   int rows = output_image->rows;
   for (int j = 0; j < rows; j++) {
     for (int i = 0; i < cols; i++) {
-      output_image->at<cv::Vec3b>(j, i)[0] = 255;  // 青
-      output_image->at<cv::Vec3b>(j, i)[1] = 255;  // 緑
-      output_image->at<cv::Vec3b>(j, i)[2] = 255;  // 赤
+      output_image->at<cv::Vec3b>(j, i)[0] = color[0];  // 青
+      output_image->at<cv::Vec3b>(j, i)[1] = color[1];  // 緑
+      output_image->at<cv::Vec3b>(j, i)[2] = color[2];  // 赤
     }
   }
 }

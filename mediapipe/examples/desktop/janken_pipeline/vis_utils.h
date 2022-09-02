@@ -6,7 +6,8 @@
 
 class VisUtility {
  public:
-  static void CreateWhiteImage(const cv::Size &size, cv::Mat *output_image);
+  static void CreateAnyColorImage(const cv::Vec3b &color, const cv::Size &size,
+                                  cv::Mat *output_image);
   static void Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width,
                       int height);
   static void DrawNodePoints(const mediapipe::NormalizedLandmarkList &landmarks,

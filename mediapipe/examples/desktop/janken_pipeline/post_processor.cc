@@ -11,9 +11,9 @@
 // #define BLACK_BACKGROUND
 
 PostProcessor::PostProcessor() {
-  k_limit_time_sec_ = 30.0;
+  k_limit_time_sec_ = 10.0;
   // k_window_name_ = "Gesture++ (beta version)";
-  k_window_name_ = "Gesture++ (YDK addition)";
+  k_window_name_ = "Gesture++ (YDK Edition)";
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
 
@@ -44,11 +44,11 @@ PostProcessor::PostProcessor() {
       cv::imread("mediapipe/resources/ryoiki_tenkai.png");
 
   k_janken_operation_image_map_[ResultType::WIN] =
-      cv::imread("mediapipe/resources/win_operation.png");
+      cv::imread("mediapipe/resources/win_operation.png", -1);
   k_janken_operation_image_map_[ResultType::LOSE] =
-      cv::imread("mediapipe/resources/loss_operation.png");
+      cv::imread("mediapipe/resources/loss_operation.png", -1);
   k_janken_operation_image_map_[ResultType::DRAW] =
-      cv::imread("mediapipe/resources/draw_operation.png");
+      cv::imread("mediapipe/resources/draw_operation.png", -1);
 
   k_imitation_operation_image_map_[GestureType::HEART] =
       cv::imread("mediapipe/resources/heart_operaion.png");
@@ -89,6 +89,12 @@ PostProcessor::PostProcessor() {
   } else {
     operation_ = ResultType::UNKNOWN;
   }
+
+  // TODO: convert function
+  status_buffer_list_ = std::vector<StatusBuffer>();
+  StatusBufferProcessor::Initialize(&status_buffer_list_);
+  
+  num_frames_since_resetting_ = 10;  // ここを 0 にしないと正解の〇が残る
 }
 
 // TODO: refactor a code below
@@ -97,6 +103,9 @@ void PostProcessor::Execute(
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
     cv::Mat *output_frame_for_display,
     std::chrono::system_clock::time_point *start_time, bool *grab_frames) {
+  std::cout << "num_frames_since_resetting_:" << num_frames_since_resetting_
+            << std::endl;
+
 #if 1
   // cv::Mat landmark_image = camera_frame_raw;
 #ifdef BLACK_BACKGROUND
@@ -239,15 +248,15 @@ void PostProcessor::Execute(
         &output_frame_display_left);
 #endif
 
-  if (num_frames_since_resetting < 10) {
-    // 合否表示注はバッファをクリアしておく。
+  if (num_frames_since_resetting_ < 10) {
+    // 合否表示中はバッファをクリアしておく。
     status_buffer_list_ = std::vector<StatusBuffer>();
     StatusBufferProcessor::Initialize(&status_buffer_list_);
 
     cv::circle(output_frame_display_left,
                cv::Point(camera_frame_raw.rows / 2, camera_frame_raw.rows / 2),
                100, cv::Scalar(0, 255, 0), 5, cv::LINE_4);
-    num_frames_since_resetting++;
+    num_frames_since_resetting_++;
   } else {
     // ジェスチャー確定処理 ---
 
@@ -318,12 +327,15 @@ void PostProcessor::Execute(
         }
       }
 
-      num_frames_since_resetting = 0;
+      num_frames_since_resetting_ = 0;
     } else {
       // CreateAnyColorImage(cv::Size(camera_frame_raw.rows,
       // camera_frame_raw.rows),
       //                  &output_frame_display_left);
       output_frame_display_left = k_gesture_image_map_[opposite_gesture_];
+      std::vector<cv::Mat> layers;
+      cv::split(output_frame_display_left, layers);
+      // std::cout << "layer-size: " << layers.size() << std::endl;
       // std::cout << output_frame_display_left.empty() << std::endl;
       // std::cout << "resize3" << std::endl;
       cv::resize(output_frame_display_left, output_frame_display_left,
@@ -336,7 +348,10 @@ void PostProcessor::Execute(
         ope_image = k_imitation_operation_image_map_[opposite_gesture_];
 
       // 全体の横幅がカメラフレームの縦幅と同じなので注意。
-      VisUtility::Overlap(output_frame_display_left, ope_image,
+      // VisUtility::Overlap(output_frame_display_left, ope_image,
+      //                     (camera_frame_raw.rows - ope_image.cols) / 2, 0,
+      //                     ope_image.cols, ope_image.rows);
+      VisUtility::PutTranspPng(output_frame_display_left, ope_image,
                           (camera_frame_raw.rows - ope_image.cols) / 2, 0,
                           ope_image.cols, ope_image.rows);
     }
@@ -433,6 +448,7 @@ void PostProcessor::Execute(
       // restart
       *start_time = std::chrono::system_clock::now();
       win_cnt_ = 0;
+      num_frames_since_resetting_ = 10;  // ここを 10 にしないと正解の〇が残る
       status_buffer_list_ = std::vector<StatusBuffer>();
       StatusBufferProcessor::Initialize(&status_buffer_list_);
     }

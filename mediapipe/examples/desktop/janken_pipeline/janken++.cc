@@ -129,8 +129,6 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   // GestureType opposite_gesture =
   //     GestureType(opposite_gesture_rand_n(mt));
 
-  int num_frames_since_resetting =
-      1000;  // 初期値がゼロだとはじめに〇が出てしまう。
   auto start_time = std::chrono::system_clock::now();
 
   auto &post_processor = PostProcessor();

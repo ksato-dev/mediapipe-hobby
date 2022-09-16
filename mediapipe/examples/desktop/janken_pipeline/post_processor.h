@@ -35,6 +35,7 @@ class PostProcessor {
   std::map<GestureType, cv::Mat> k_gesture_image_map_;
   std::map<ResultType, cv::Mat> k_janken_operation_image_map_;
   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
+  std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
   std::mt19937_64
@@ -53,5 +54,5 @@ class PostProcessor {
   std::vector<StatusBuffer> status_buffer_list_;
   int time_since_resetting_;  // 初期値がゼロだとはじめに〇が出てしまう。
   int win_cnt_;
-  unsigned long long num_frames_since_resetting = 0;
+  unsigned long long num_frames_since_resetting_ = 0;
 };

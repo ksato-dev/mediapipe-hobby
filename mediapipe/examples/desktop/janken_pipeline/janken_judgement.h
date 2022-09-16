@@ -2,16 +2,8 @@
 
 #include <string>
 
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
-
-// cite: https://github.com/ksato-dev/JankenExercise
-enum class ResultType {
-  UNKNOWN,
-  WIN,
-  LOSE,
-  DRAW,
-  NUM_RESULT_TYPES,
-};
 
 class JankenJudgement {
  public:

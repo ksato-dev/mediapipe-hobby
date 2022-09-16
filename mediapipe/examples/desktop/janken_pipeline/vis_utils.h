@@ -3,6 +3,7 @@
 #include <opencv2/opencv.hpp>
 
 #include "mediapipe/framework/formats/landmark.pb.h"
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 
 class VisUtility {
  public:

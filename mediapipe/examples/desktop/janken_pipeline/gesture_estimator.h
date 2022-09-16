@@ -6,27 +6,10 @@
 #include <vector>
 
 #include "mediapipe/framework/formats/landmark.pb.h"
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 
 
 // TODO: 公式のコードを見て、左右判定をできるようにする。
-
-enum HandType {
-  LEFT_HAND = 0,
-  RIGHT_HAND = 1,
-};
-
-enum class RuleType { UNKNOWN, JANKEN, IMITATION, NUM_RULES };
-
-enum class GestureType {
-  UNKNOWN,
-  GU,     // JANKEN
-  CHOKI,  // JANKEN
-  PA,     // JANKEN
-  HEART,
-  THE_103,
-  RYOIKI_TENKAI,
-  NUM_GESTURES
-};
 
 class AbstractHandGestureEstimator {
  public:

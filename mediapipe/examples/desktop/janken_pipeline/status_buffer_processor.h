@@ -3,6 +3,7 @@
 #include <deque>
 #include <vector>
 
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 
 typedef std::deque<bool> StatusBuffer;

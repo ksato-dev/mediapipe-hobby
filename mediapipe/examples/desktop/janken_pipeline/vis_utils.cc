@@ -27,6 +27,7 @@ void VisUtility::CreateAnyColorImage(const cv::Vec3b &color, const cv::Size &siz
 // ref: https://kougaku-navi.hatenablog.com/entry/20160108/p1
 void VisUtility::Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width,
                          int height) {
+  if (src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
   cv::Mat resized_img;
   cv::resize(src, resized_img, cv::Size(width, height));
 
@@ -93,45 +94,58 @@ void VisUtility::BlurImage(const cv::Size &gauss_kernel,
 //! cite: https://qiita.com/koyayashi/items/ce620783a6cae726b4c1
 void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y, int width,
                          int height) {
-  std::vector<cv::Mat> layers;
-  cv::split(src, layers);
+  // std::cout << "channels:" << src.channels() << std::endl;
+  // if (src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
+
   // 下記の処理は_pngがRGBAの4チャンネルMatである必要がある
-  if (4 != layers.size()) {
+  if (4 != src.channels()) {
     // std::cout << "putTranspPng() invalid input" << std::endl;
-    cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
     VisUtility::Overlap(dst, src, x, y, width, height);
     return;
   }
-
   cv::Mat resized_img;
   cv::resize(src, resized_img, cv::Size(width, height));
 
-  if (x >= dst.cols || y >= dst.rows) return;
-  int w = (x >= 0) ? std::min(dst.cols - x, resized_img.cols)
-                   : std::min(std::max(resized_img.cols + x, 0), dst.cols);
-  int h = (y >= 0) ? std::min(dst.rows - y, resized_img.rows)
-                   : std::min(std::max(resized_img.rows + y, 0), dst.rows);
-  int u = (x >= 0) ? 0 : std::min(-x, resized_img.cols - 1);
-  int v = (y >= 0) ? 0 : std::min(-y, resized_img.rows - 1);
   int px = std::max(x, 0);
   int py = std::max(y, 0);
 
   // ---
+  std::vector<cv::Mat> layers;
   cv::split(resized_img, layers);
-  // 下記の処理は_pngがRGBAの4チャンネルMatである必要がある
-  if (4 != layers.size())
-    // std::cout << "putTranspPng() invalid input" << std::endl;
 
   // 貼り付ける画像（3チャンネル）
   // cv::Mat resized_img;
   cv::merge(layers.data(), 3, resized_img);
   // copyToに使うmask（1チャンネル）
   cv::Mat mask = layers[3];
-  // copyToに使うroi
-  // cv::Mat roi = dst(cv::Rect(px, py, w, h));
-  // resized_img.copyTo(roi, mask);
 
-  cv::Mat roi_dst = dst(cv::Rect(px, py, w, h));
-  cv::Mat roi_resized = resized_img(cv::Rect(u, v, w, h));
-  roi_resized.copyTo(roi_dst, mask);
+  cv::Mat roi_dst = dst(cv::Rect(px, py, width, height));
+
+  resized_img.copyTo(resized_img, mask);
+  for (int dst_y = 0; dst_y < dst.rows; dst_y++) {
+    cv::Vec3b *dst_img_row = dst.ptr<cv::Vec3b>(dst_y);
+    for (int dst_x = 0; dst_x < dst.cols; dst_x++) {
+      auto flag_x = (px <= dst_x && dst_x < px + width);
+      auto flag_y = (py <= dst_y && dst_y < py + height);
+      if (flag_x && flag_y) { 
+        int mask_px = dst_x - px;
+        int mask_py = dst_y - py;
+        // std::cout << mask.type() << std::endl;
+        // auto mask_value = mask.at<uint8_t>(mask_py, mask_px);
+        // uint8_t mask_value = mask(Point(mask_py, mask_px));
+        uint8_t *mask_img_row = mask.ptr<uint8_t>(mask_py);
+        uint8_t mask_value = mask_img_row[mask_px];
+        if (mask_value > 50) {
+          // std::cout << (int)mask_value << std::endl;
+          cv::Vec3b *resized_src_img_row = resized_img.ptr<cv::Vec3b>(mask_py);
+          cv::Vec3b src_pix_data = resized_src_img_row[mask_px];
+          // dst_img_row[dst_x] = cv::Vec3b(243, 161, 130);
+          dst_img_row[dst_x] = src_pix_data;
+          // std::cout << "px, py: " << mask_px << ", " << mask_py << std::endl;
+        }
+        // std::cout << "px, py: " << mask_px << ", " << mask_py << std::endl;
+      }
+    }
+  }
+  // std::cout << "Done PutTransPng." << std::endl;
 }

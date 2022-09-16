@@ -5,6 +5,7 @@
 #include <random>
 #include <vector>
 
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
@@ -35,7 +36,8 @@ class PostProcessor {
   std::map<GestureType, cv::Mat> k_gesture_image_map_;
   std::map<ResultType, cv::Mat> k_janken_operation_image_map_;
   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
-  std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
+  std::map<ScoreRank, cv::Mat> k_score_rank_image_map_;
+//   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
   std::mt19937_64

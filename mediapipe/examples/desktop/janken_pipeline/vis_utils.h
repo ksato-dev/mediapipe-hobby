@@ -20,8 +20,7 @@ class VisUtility {
   static void BlurImage(const cv::Size &gauss_kernel, const cv::Mat &src_image,
                         cv::Mat *dst_image);
 
-  static void PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y, int width,
-                           int height);
+  static void PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y);
 
  private:
   static const std::vector<std::vector<int>> connection_list_;

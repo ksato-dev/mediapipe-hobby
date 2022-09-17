@@ -115,6 +115,7 @@ PostProcessor::PostProcessor() {
 }
 
 // TODO: refactor a code below
+// TODO: ハードコーディングしているパラメータのグローバル化＆外部ファイル化
 void PostProcessor::Execute(
     const cv::Mat &camera_frame_raw,
     std::vector<mediapipe::NormalizedLandmarkList> *landmarks_list,
@@ -163,17 +164,21 @@ void PostProcessor::Execute(
 
   auto current_recognized_type = GestureType::UNKNOWN;
   if (landmarks_list->size() == 0) {
-    // VisUtility::Overlap(
-    //     output_frame_display_right, k_description_image_,
-    //     (camera_frame_raw.rows - k_description_image_.cols) / 2 + 45,
-    //     (camera_frame_raw.rows - k_description_image_.rows) / 2,
-    //     k_description_image_.cols * 0.8, k_description_image_.rows * 0.8);
-    // std::cout << "desctription" << std::endl;
+    const float resize_ratio = 0.75;
+    const int resized_gesture_image_width =
+        std::roundl(k_description_image_.cols * resize_ratio);
+    const int resized_gesture_image_height =
+        std::roundl(k_description_image_.rows * resize_ratio);
+
+    cv::Mat resized_description_image;
+    cv::resize(
+        k_description_image_, resized_description_image,
+        cv::Size(resized_gesture_image_width, resized_gesture_image_height));
+
     VisUtility::PutTranspPng(
-        output_frame_display_right, k_description_image_,
+        output_frame_display_right, resized_description_image,
         (camera_frame_raw.rows - k_description_image_.cols) / 2 + 45,
-        (camera_frame_raw.rows - k_description_image_.rows) / 2,
-        k_description_image_.cols * 0.8, k_description_image_.rows * 0.8);
+        (camera_frame_raw.rows - k_description_image_.rows) / 2);
   } else {
     // else if (landmarks_list.size() == 1) {
     // 片手 -> 両手でもおｋにした。
@@ -267,7 +272,7 @@ void PostProcessor::Execute(
     // std::cout << "your gesture" << std::endl;
     VisUtility::PutTranspPng(output_frame_display_right, overlap_image,
                              (camera_frame_raw.rows - overlap_image.cols) / 2,
-                             0, overlap_image.cols, overlap_image.rows);
+                             0);
   }
   cv::putText(
       output_frame_display_right, std::string("Quit: <ESC>"),
@@ -379,17 +384,11 @@ void PostProcessor::Execute(
 
       // output_frame_display_left = k_gesture_image_map_[opposite_gesture_];
       cv::Mat gesture_image = k_gesture_image_map_[opposite_gesture_];
-      // std::vector<cv::Mat> layers;
-      // cv::split(gesture_image, layers);
-      // std::cout << "layer-size: " << layers.size() << std::endl;
-      // std::cout << output_frame_display_left.empty() << std::endl;
-      // std::cout << "resize3" << std::endl;
+
       cv::resize(gesture_image, gesture_image,
                  output_frame_display_left.size());
       // std::cout << "next gesture" << std::endl;
-      VisUtility::PutTranspPng(output_frame_display_left, gesture_image, 0, 0,
-                               output_frame_display_left.cols,
-                               output_frame_display_left.rows);
+      VisUtility::PutTranspPng(output_frame_display_left, gesture_image, 0, 0);
 
       cv::Mat ope_image;
 
@@ -399,9 +398,6 @@ void PostProcessor::Execute(
         ope_image = k_imitation_operation_image_map_[opposite_gesture_];
 
       // 全体の横幅がカメラフレームの縦幅と同じなので注意。
-      // VisUtility::Overlap(output_frame_display_left, ope_image,
-      //                     (camera_frame_raw.rows - ope_image.cols) / 2, 0,
-      //                     ope_image.cols, ope_image.rows);
 
       const float resize_ratio = (output_frame_display_left.rows * 0.13 /
                                   ope_image.rows);  // 縦幅の１３％にする。
@@ -413,14 +409,11 @@ void PostProcessor::Execute(
       cv::resize(
           ope_image, ope_image,
           cv::Size(resized_gesture_image_width, resized_gesture_image_height));
-      // std::cout << resized_gesture_image_width << ", " <<
-      // resized_gesture_image_height << std::endl;
 
       // std::cout << "operation" << std::endl;
       VisUtility::PutTranspPng(
           output_frame_display_left, ope_image,
-          (output_frame_display_left.cols - ope_image.cols) / 2, 0,
-          ope_image.cols, ope_image.rows);
+          (output_frame_display_left.cols - ope_image.cols) / 2, 0);
       // cv::imshow("transparent", output_frame_display_left);
       // cv::waitKey(0);
     }
@@ -545,8 +538,7 @@ void PostProcessor::Execute(
     VisUtility::PutTranspPng(
         instruction_image, score_rank_image,
         (instruction_image.cols - score_rank_image.cols) / 2,
-        (instruction_image.rows - score_rank_image.rows) / 2,
-        score_rank_image.cols, score_rank_image.rows);
+        (instruction_image.rows - score_rank_image.rows) / 2);
     // VisUtility::PutTranspPng(instruction_image, ope_image,
     //                          (camera_frame_raw.rows - ope_image.cols) / 2, 0,
     //                          ope_image.cols, ope_image.rows);

@@ -90,41 +90,40 @@ void VisUtility::BlurImage(const cv::Size &gauss_kernel,
 }
 
 //! cite: https://qiita.com/koyayashi/items/ce620783a6cae726b4c1
-void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y,
-                              int width, int height) {
+void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y) {
   // std::cout << "channels:" << src.channels() << std::endl;
   // if (src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
 
   // 下記の処理は_pngがRGBAの4チャンネルMatである必要がある
   if (4 != src.channels()) {
-    // std::cout << "putTranspPng() invalid input" << std::endl;
+    std::cout << "putTranspPng() invalid input" << std::endl;
     VisUtility::Overlap(dst, src, x, y);
     return;
   }
-  cv::Mat resized_img;
-  cv::resize(src, resized_img, cv::Size(width, height));
+  // cv::Mat resized_img;
+  // cv::resize(src, resized_img, cv::Size(width, height));
 
   int px = std::max(x, 0);
   int py = std::max(y, 0);
 
   // ---
   std::vector<cv::Mat> layers;
-  cv::split(resized_img, layers);
+  cv::split(src, layers);
 
   // 貼り付ける画像（3チャンネル）
   // cv::Mat resized_img;
-  cv::merge(layers.data(), 3, resized_img);
+  cv::merge(layers.data(), 3, src);
   // copyToに使うmask（1チャンネル）
   cv::Mat mask = layers[3];
 
-  cv::Mat roi_dst = dst(cv::Rect(px, py, width, height));
+  cv::Mat roi_dst = dst(cv::Rect(px, py, src.cols, src.rows));
 
-  resized_img.copyTo(resized_img, mask);
+  src.copyTo(src, mask);
   for (int dst_y = 0; dst_y < dst.rows; dst_y++) {
     cv::Vec3b *dst_img_row = dst.ptr<cv::Vec3b>(dst_y);
     for (int dst_x = 0; dst_x < dst.cols; dst_x++) {
-      auto flag_x = (px <= dst_x && dst_x < px + width);
-      auto flag_y = (py <= dst_y && dst_y < py + height);
+      auto flag_x = (px <= dst_x && dst_x < px + src.cols);
+      auto flag_y = (py <= dst_y && dst_y < py + src.rows);
       if (flag_x && flag_y) {
         int mask_px = dst_x - px;
         int mask_py = dst_y - py;
@@ -135,8 +134,8 @@ void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y,
         uint8_t mask_value = mask_img_row[mask_px];
         if (mask_value > 50) {
           // std::cout << (int)mask_value << std::endl;
-          cv::Vec3b *resized_src_img_row = resized_img.ptr<cv::Vec3b>(mask_py);
-          cv::Vec3b src_pix_data = resized_src_img_row[mask_px];
+          cv::Vec3b *src_img_row = src.ptr<cv::Vec3b>(mask_py);
+          cv::Vec3b src_pix_data = src_img_row[mask_px];
           // dst_img_row[dst_x] = cv::Vec3b(243, 161, 130);
           dst_img_row[dst_x] = src_pix_data;
           // std::cout << "px, py: " << mask_px << ", " << mask_py << std::endl;

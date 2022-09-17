@@ -85,6 +85,9 @@ PostProcessor::PostProcessor() {
 
   k_th_score_ = 0.70;
 
+  k_blue_color_ = cv::Vec3b(243, 161, 130);
+  k_pink_color_ = cv::Vec3b(203, 192, 255);
+
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
 
@@ -131,8 +134,7 @@ void PostProcessor::Execute(
 #else
   cv::Mat landmark_image;
   VisUtility::CreateAnyColorImage(
-      // cv::Vec3b(203, 192, 255),
-      cv::Vec3b(243, 161, 130), camera_frame_raw.size(), &landmark_image);
+      k_blue_color_, camera_frame_raw.size(), &landmark_image);
 #endif
 #else
   cv::Mat landmark_image;
@@ -154,8 +156,7 @@ void PostProcessor::Execute(
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 #else
   VisUtility::CreateAnyColorImage(
-      cv::Vec3b(203, 192, 255),
-      // cv::Vec3b(243, 161, 130),
+      k_pink_color_,
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
       &output_frame_display_right);
 #endif
@@ -199,7 +200,7 @@ void PostProcessor::Execute(
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 #else
       VisUtility::CreateAnyColorImage(
-          cv::Vec3b(243, 161, 130),
+          k_blue_color_,
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
           &gesture_image);
 #endif
@@ -215,8 +216,7 @@ void PostProcessor::Execute(
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows), CV_8UC3);
 #else
     VisUtility::CreateAnyColorImage(
-        cv::Vec3b(203, 192, 255),
-        // cv::Vec3b(243, 161, 130),
+        k_pink_color_,
         cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
         &output_frame_display_right);
 #endif
@@ -288,7 +288,7 @@ void PostProcessor::Execute(
 #else
   cv::Mat output_frame_display_left;
   VisUtility::CreateAnyColorImage(
-      cv::Vec3b(203, 192, 255),
+      k_pink_color_,
       cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
       &output_frame_display_left);
 #endif
@@ -378,7 +378,7 @@ void PostProcessor::Execute(
       // camera_frame_raw.rows),
       //                  &output_frame_display_left);
       VisUtility::CreateAnyColorImage(
-          cv::Vec3b(203, 192, 255),
+          k_pink_color_,
           cv::Size(camera_frame_raw.rows, camera_frame_raw.rows),
           &output_frame_display_left);
 
@@ -475,7 +475,7 @@ void PostProcessor::Execute(
         cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
 #else
     cv::Mat result_image;
-    VisUtility::CreateAnyColorImage(cv::Vec3b(203, 192, 255),
+    VisUtility::CreateAnyColorImage(k_pink_color_,
                                     output_frame_display_left.size(),
                                     &result_image);
 #endif
@@ -516,7 +516,7 @@ void PostProcessor::Execute(
         cv::Mat::zeros(output_frame_display_left.size(), CV_8UC3);
 #else
     cv::Mat instruction_image;
-    VisUtility::CreateAnyColorImage(cv::Vec3b(203, 192, 255),
+    VisUtility::CreateAnyColorImage(k_pink_color_,
                                     output_frame_display_left.size(),
                                     &instruction_image);
     // cv::cvtColor(instruction_image, instruction_image, cv::COLOR_BGR2BGRA);

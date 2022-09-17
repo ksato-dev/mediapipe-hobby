@@ -52,6 +52,9 @@ class PostProcessor {
   // GestureType をひっかけてルールタイプを取り出す。
   std::map<GestureType, RuleType> k_gesture_and_rule_map_;
 
+  cv::Vec3b k_blue_color_;
+  cv::Vec3b k_pink_color_;
+
   std::vector<StatusBuffer> status_buffer_list_;
   int time_since_resetting_;  // 初期値がゼロだとはじめに〇が出てしまう。
   int win_cnt_;

@@ -47,7 +47,6 @@
 #include "mediapipe/framework/port/parse_text_proto.h"
 #include "mediapipe/framework/port/status.h"
 
-
 // TODO: Convert parameters from local to global, & move parameters to external
 // file.
 constexpr char kInputStream[] = "input_video";

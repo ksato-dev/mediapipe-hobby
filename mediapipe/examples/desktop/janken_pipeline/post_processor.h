@@ -11,7 +11,6 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/framework/formats/landmark.pb.h"
 
-
 class PostProcessor {
  public:
   PostProcessor();
@@ -37,7 +36,7 @@ class PostProcessor {
   std::map<ResultType, cv::Mat> k_janken_operation_image_map_;
   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
   std::map<ScoreRank, cv::Mat> k_score_rank_image_map_;
-//   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
+  //   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
   std::mt19937_64

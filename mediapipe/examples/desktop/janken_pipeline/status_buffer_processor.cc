@@ -7,7 +7,7 @@ void StatusBufferProcessor::Initialize(
     std::vector<StatusBuffer> *status_buffer_list) {
   for (int i = 0; i < (int)(GestureType::NUM_GESTURES); i++)
     status_buffer_list->push_back(StatusBuffer(k_buffer_size_, 0));
-    // status_buffer_list->at(i) = StatusBuffer(buffer_size, 0);
+  // status_buffer_list->at(i) = StatusBuffer(buffer_size, 0);
 }
 
 void StatusBufferProcessor::Update(

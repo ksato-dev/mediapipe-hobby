@@ -5,9 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include "mediapipe/framework/formats/landmark.pb.h"
 #include "mediapipe/examples/desktop/janken_pipeline/common.h"
-
+#include "mediapipe/framework/formats/landmark.pb.h"
 
 // TODO: 公式のコードを見て、左右判定をできるようにする。
 

@@ -10,7 +10,9 @@ const std::vector<std::vector<int>> VisUtility::connection_list_ = {
 };
 
 // 白画像を作る関数
-void VisUtility::CreateAnyColorImage(const cv::Vec3b &color, const cv::Size &size, cv::Mat *output_image) {
+void VisUtility::CreateAnyColorImage(const cv::Vec3b &color,
+                                     const cv::Size &size,
+                                     cv::Mat *output_image) {
   *output_image = cv::Mat::zeros(size, CV_8UC3);
   int cols = output_image->cols;
   int rows = output_image->rows;
@@ -25,24 +27,20 @@ void VisUtility::CreateAnyColorImage(const cv::Vec3b &color, const cv::Size &siz
 
 // 画像を画像に貼り付ける関数
 // ref: https://kougaku-navi.hatenablog.com/entry/20160108/p1
-void VisUtility::Overlap(cv::Mat dst, cv::Mat src, int x, int y, int width,
-                         int height) {
+void VisUtility::Overlap(cv::Mat dst, cv::Mat src, int x, int y) {
   if (src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
-  cv::Mat resized_img;
-  cv::resize(src, resized_img, cv::Size(width, height));
-
   if (x >= dst.cols || y >= dst.rows) return;
-  int w = (x >= 0) ? std::min(dst.cols - x, resized_img.cols)
-                   : std::min(std::max(resized_img.cols + x, 0), dst.cols);
-  int h = (y >= 0) ? std::min(dst.rows - y, resized_img.rows)
-                   : std::min(std::max(resized_img.rows + y, 0), dst.rows);
-  int u = (x >= 0) ? 0 : std::min(-x, resized_img.cols - 1);
-  int v = (y >= 0) ? 0 : std::min(-y, resized_img.rows - 1);
+  int w = (x >= 0) ? std::min(dst.cols - x, src.cols)
+                   : std::min(std::max(src.cols + x, 0), dst.cols);
+  int h = (y >= 0) ? std::min(dst.rows - y, src.rows)
+                   : std::min(std::max(src.rows + y, 0), dst.rows);
+  int u = (x >= 0) ? 0 : std::min(-x, src.cols - 1);
+  int v = (y >= 0) ? 0 : std::min(-y, src.rows - 1);
   int px = std::max(x, 0);
   int py = std::max(y, 0);
 
   cv::Mat roi_dst = dst(cv::Rect(px, py, w, h));
-  cv::Mat roi_resized = resized_img(cv::Rect(u, v, w, h));
+  cv::Mat roi_resized = src(cv::Rect(u, v, w, h));
   roi_resized.copyTo(roi_dst);
 }
 
@@ -92,15 +90,15 @@ void VisUtility::BlurImage(const cv::Size &gauss_kernel,
 }
 
 //! cite: https://qiita.com/koyayashi/items/ce620783a6cae726b4c1
-void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y, int width,
-                         int height) {
+void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y,
+                              int width, int height) {
   // std::cout << "channels:" << src.channels() << std::endl;
   // if (src.channels() == 4) cv::cvtColor(src, src, cv::COLOR_BGRA2BGR);
 
   // 下記の処理は_pngがRGBAの4チャンネルMatである必要がある
   if (4 != src.channels()) {
     // std::cout << "putTranspPng() invalid input" << std::endl;
-    VisUtility::Overlap(dst, src, x, y, width, height);
+    VisUtility::Overlap(dst, src, x, y);
     return;
   }
   cv::Mat resized_img;
@@ -127,7 +125,7 @@ void VisUtility::PutTranspPng(cv::Mat &dst, cv::Mat &src, int x, int y, int widt
     for (int dst_x = 0; dst_x < dst.cols; dst_x++) {
       auto flag_x = (px <= dst_x && dst_x < px + width);
       auto flag_y = (py <= dst_y && dst_y < py + height);
-      if (flag_x && flag_y) { 
+      if (flag_x && flag_y) {
         int mask_px = dst_x - px;
         int mask_py = dst_y - py;
         // std::cout << mask.type() << std::endl;

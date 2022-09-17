@@ -2,8 +2,7 @@
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 
 const ResultType JankenJudgement::JudgeNormalJanken(
-    const GestureType &your_gesture,
-    const GestureType &opposite_gesture) {
+    const GestureType &your_gesture, const GestureType &opposite_gesture) {
   ResultType ret_result_type = ResultType::UNKNOWN;
   if (your_gesture != GestureType::UNKNOWN) {
     if (your_gesture == opposite_gesture)

@@ -32,10 +32,10 @@
 #include "absl/flags/parse.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 // #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
-// #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
+// #include
+// "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 // #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 #include "mediapipe/examples/desktop/janken_pipeline/post_processor.h"
-
 #include "mediapipe/framework/calculator_framework.h"
 #include "mediapipe/framework/formats/image_frame.h"
 #include "mediapipe/framework/formats/image_frame_opencv.h"
@@ -56,7 +56,6 @@ constexpr char kOutputStream[] = "landmarks";
 const int kCvWaitkeyEsc = 27;
 const int kCvWaitkeySpase = 32;
 const double kLimitTimeSec = 20.0;
-const int kBufferSize = 23;
 
 absl::Status Configure(const std::string &calculator_graph_config_file,
                        mediapipe::CalculatorGraphConfig *config) {
@@ -76,7 +75,7 @@ absl::Status Configure(const std::string &calculator_graph_config_file,
 absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   int win_cnt = 0;
   std::vector<StatusBuffer> status_buffer_list;
-  StatusBufferProcessor::Initialize(kBufferSize, &status_buffer_list);
+  StatusBufferProcessor::Initialize(&status_buffer_list);
 
   // std::cout << "called RunMPPGraph" << std::endl;
   mediapipe::CalculatorGraphConfig config;
@@ -89,6 +88,22 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   // two_hands_estimator_list = {
   //   std::make_shared<HeartGestureEstimator>()
   // };
+
+  cv::VideoCapture capture;
+  // 空いてるカメラ探しに行く処理 ---
+  const int limit_cams = 10;
+  for (int i = 0; i < limit_cams; i++) {
+    capture.open(i);
+    cv::Mat temp;
+    capture >> temp;
+    if (temp.empty()) {
+      std::cout << "This camera is used, maybe." << std::endl;
+      capture.release();
+    } else {
+      break;
+    }
+  }
+  // --- 空いてるカメラ探しに行く処理
 
   mediapipe::CalculatorGraph graph;
 
@@ -107,19 +122,12 @@ absl::Status RunMPPGraph(const std::string &calculator_graph_config_file) {
   }
   MP_RETURN_IF_ERROR(graph.StartRun({}));
 
-  cv::VideoCapture capture;
-  capture.open(
-      0);  // TODO:
-           // 複数カメラ接続している時に自動空いているカメラを使いに行かせる。
-  // TODO: camera size を固定にするか自動にするか決める。
-
   bool grab_frames = true;
 
   // ResultType operation = ResultType(operation_rand_n(mt));
   // GestureType opposite_gesture =
   //     GestureType(opposite_gesture_rand_n(mt));
 
-  int num_frames_since_resetting = 1000;  // 初期値がゼロだとはじめに〇が出てしまう。
   auto start_time = std::chrono::system_clock::now();
 
   auto &post_processor = PostProcessor();

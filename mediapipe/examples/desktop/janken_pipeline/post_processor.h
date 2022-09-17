@@ -5,11 +5,11 @@
 #include <random>
 #include <vector>
 
+#include "mediapipe/examples/desktop/janken_pipeline/common.h"
 #include "mediapipe/examples/desktop/janken_pipeline/gesture_estimator.h"
 #include "mediapipe/examples/desktop/janken_pipeline/janken_judgement.h"
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/framework/formats/landmark.pb.h"
-
 
 class PostProcessor {
  public:
@@ -25,7 +25,6 @@ class PostProcessor {
   double k_limit_time_sec_;
   int k_cv_waitkey_esc_;
   int k_cv_waitkey_spase_;
-  int k_buffer_size_;
 
   cv::Mat k_description_image_;
   cv::Mat k_your_hand_image_;
@@ -36,6 +35,8 @@ class PostProcessor {
   std::map<GestureType, cv::Mat> k_gesture_image_map_;
   std::map<ResultType, cv::Mat> k_janken_operation_image_map_;
   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
+  std::map<ScoreRank, cv::Mat> k_score_rank_image_map_;
+  //   std::map<GestureType, cv::Mat> k_imitation_operation_image_map_;
 
   double k_th_score_;
   std::mt19937_64
@@ -51,8 +52,11 @@ class PostProcessor {
   // GestureType をひっかけてルールタイプを取り出す。
   std::map<GestureType, RuleType> k_gesture_and_rule_map_;
 
+  cv::Vec3b k_blue_color_;
+  cv::Vec3b k_pink_color_;
+
   std::vector<StatusBuffer> status_buffer_list_;
   int time_since_resetting_;  // 初期値がゼロだとはじめに〇が出てしまう。
   int win_cnt_;
-  unsigned long long num_frames_since_resetting = 0;
+  unsigned long long num_frames_since_resetting_ = 0;
 };

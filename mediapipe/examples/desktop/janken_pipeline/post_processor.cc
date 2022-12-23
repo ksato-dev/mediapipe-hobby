@@ -8,12 +8,13 @@
 #include "mediapipe/examples/desktop/janken_pipeline/status_buffer_processor.h"
 #include "mediapipe/examples/desktop/janken_pipeline/vis_utils.h"
 
+#define ENABLE_RAW_IMAGE
 // #define BLACK_BACKGROUND
 
 PostProcessor::PostProcessor() {
   k_limit_time_sec_ = 30.0;
-  // k_window_name_ = "Gesture++ (beta version)";
-  k_window_name_ = "Gesture++ (YDK Edition)";
+  k_window_name_ = "Gesture++ (beta version)";
+  // k_window_name_ = "Gesture++ (YDK Edition)";
   k_cv_waitkey_esc_ = 27;
   k_cv_waitkey_spase_ = 32;
 
@@ -85,8 +86,10 @@ PostProcessor::PostProcessor() {
 
   k_th_score_ = 0.70;
 
-  k_blue_color_ = cv::Vec3b(243, 161, 130);
-  k_pink_color_ = cv::Vec3b(203, 192, 255);
+  // k_blue_color_ = cv::Vec3b(243, 161, 130);
+  // k_pink_color_ = cv::Vec3b(203, 192, 255);
+  k_blue_color_ = cv::Vec3b(0, 255, 0);
+  k_pink_color_ = cv::Vec3b(0, 0, 0);
 
   std::random_device rnd;  // 非決定的な乱数生成器
   k_mt_ = std::mt19937_64(rnd());
@@ -127,8 +130,9 @@ void PostProcessor::Execute(
   // std::cout << "num_frames_since_resetting_:" << num_frames_since_resetting_
   //           << std::endl;
 
-#if 1
-  // cv::Mat landmark_image = camera_frame_raw;
+#ifdef ENABLE_RAW_IMAGE
+  cv::Mat landmark_image = camera_frame_raw;
+#else
 #ifdef BLACK_BACKGROUND
   cv::Mat landmark_image = cv::Mat::zeros(camera_frame_raw.size(), CV_8UC3);
 #else
@@ -136,7 +140,9 @@ void PostProcessor::Execute(
   VisUtility::CreateAnyColorImage(
       k_blue_color_, camera_frame_raw.size(), &landmark_image);
 #endif
-#else
+#endif
+
+#ifdef BLUER_IMAGE
   cv::Mat landmark_image;
   VisUtility::BlurImage(cv::Size(11, 11), camera_frame_raw, &landmark_image);
 #endif
